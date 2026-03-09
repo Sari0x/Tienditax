@@ -1,118 +1,103 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tienditax</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <!-- LOGIN -->
-  <section id="loginPage" class="page">
-    <div class="login-card">
-      <div class="brand-top">Plataforma interna</div>
-      <h1>Tienditax</h1>
-      <p class="subtitle">Acceso administrativo para carga y exportación de productos.</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tienditax</title>
+    <link rel="icon" type="image/png" href="https://i.postimg.cc/wvwVpYgN/Gemini-Generated-Image-ho93mhho93mhho93-removebg-preview.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <section id="loginPage" class="page page-center">
+      <div class="card login-card">
+        <img class="logo" src="https://i.postimg.cc/wvwVpYgN/Gemini-Generated-Image-ho93mhho93mhho93-removebg-preview.png" alt="Tienditax" />
+        <h1>Tienditax</h1>
+        <p class="subtitle">Acceso seguro para gestión y exportación de catálogos.</p>
 
-      <div class="form-group">
-        <label for="user">Usuario</label>
-        <input id="user" type="text" placeholder="Ingresar usuario" />
+        <form id="loginForm" class="stack-12">
+          <label class="field-label" for="user">Email</label>
+          <input id="user" type="email" autocomplete="username" required placeholder="usuario@empresa.com" />
+
+          <label class="field-label" for="pass">Contraseña</label>
+          <div class="password-wrap">
+            <input id="pass" type="password" autocomplete="current-password" required placeholder="••••••••" />
+            <button id="togglePassword" type="button" class="icon-btn">Mostrar</button>
+          </div>
+
+          <button id="loginBtn" class="primary-btn" type="submit">Ingresar</button>
+          <p id="error" class="error-text" role="alert"></p>
+        </form>
       </div>
+    </section>
 
-      <div class="form-group">
-        <label for="pass">Contraseña</label>
-        <input id="pass" type="password" placeholder="Ingresar contraseña" />
-      </div>
-
-      <button class="primary-btn" onclick="login()">Ingresar</button>
-      <p id="error" class="error-text"></p>
-    </div>
-  </section>
-
-  <!-- SELECCIÓN DE TIENDA -->
-  <section id="storePage" class="page hidden">
-    <div class="panel">
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">Panel principal</span>
-          <h2>Seleccionar tienda</h2>
-          <p>Elegí el canal con el que querés trabajar.</p>
-        </div>
-        <button class="ghost-btn" onclick="logout()">Cerrar sesión</button>
-      </div>
-
-      <div class="stores">
-        <button class="store-btn" onclick="openStore('Tienda BNA')">
-          <img src="https://i.ibb.co/jPB2fcMJ/logo-bna.png" alt="BNA" />
-        </button>
-
-        <button class="store-btn" onclick="openStore('Tienda Macro')">
-          <img src="https://i.ibb.co/vx557jDZ/logo-tienda-macro.webp" alt="Macro" />
-        </button>
-
-        <button class="store-btn" onclick="openStore('Tienda Ciudad')">
-          <img src="https://i.ibb.co/GfKZ8K7h/logo-ciudad.webp" alt="Ciudad" />
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <!-- CARGA DE PRODUCTOS -->
-  <section id="productPage" class="page hidden">
-    <div class="panel wide">
-      <div class="panel-header">
-        <div>
-          <span class="eyebrow">Carga de productos</span>
-          <h2 id="storeTitle">Tienda</h2>
-          <p>Completá los productos en formato fila y exportalos en CSV.</p>
+    <section id="appPage" class="page hidden">
+      <aside id="drawer" class="drawer" aria-hidden="true">
+        <div class="drawer-head">
+          <h3>Menú</h3>
+          <button id="closeDrawer" class="ghost-btn">Cerrar</button>
         </div>
 
-        <div class="header-actions">
-          <button class="ghost-btn" onclick="backToStores()">Volver a tiendas</button>
-          <button class="ghost-btn" onclick="logout()">Cerrar sesión</button>
+        <div class="drawer-section">
+          <h4>Historial de exports</h4>
+          <div id="exportsHistory" class="exports-list"></div>
         </div>
-      </div>
 
-      <div class="toolbar">
-        <button class="secondary-btn" onclick="addRow()">+ Agregar fila</button>
-        <button class="primary-btn" onclick="exportCSV()">Exportar en CSV</button>
-      </div>
+        <div class="drawer-section">
+          <h4>Gestión de categorías</h4>
+          <div class="stack-8">
+            <select id="categoryStoreSelect"></select>
+            <div class="inline">
+              <input id="newStoreInput" type="text" placeholder="Crear nueva tienda" />
+              <button id="createStoreBtn" class="secondary-btn">Crear</button>
+            </div>
+            <div id="dropZone" class="drop-zone">Arrastrar XLSX o <label class="link-like" for="xlsxInput">seleccionar archivo</label></div>
+            <input id="xlsxInput" type="file" accept=".xlsx,.xls" hidden />
+            <div class="inline">
+              <input id="catNameInput" type="text" placeholder="Nombre categoría" />
+              <input id="catIdInput" type="number" placeholder="ID" />
+              <button id="addCategoryBtn" class="secondary-btn">Agregar</button>
+            </div>
+            <div id="categoriesList" class="categories-list"></div>
+          </div>
+        </div>
+      </aside>
 
-      <div class="table-wrap">
-        <table id="productTable">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Description</th>
-              <th>Category</th>
-              <th>Transaction Type</th>
-              <th>Manufacturer</th>
-              <th>Price</th>
-              <th>Price Without Taxes</th>
-              <th>Available On</th>
-              <th>Sale Price</th>
-              <th>Sale Price Without Taxes</th>
-              <th>sale_on</th>
-              <th>sale_until</th>
-              <th>Height</th>
-              <th>Length</th>
-              <th>Width</th>
-              <th>Weight</th>
-              <th>Property Quantity</th>
-              <th>Property Names</th>
-              <th>Property Values</th>
-              <th>Property SKU</th>
-              <th>BRAND</th>
-              <th>ORIGIN_OF_PRODUCT</th>
-              <th>Acción</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+      <main class="app-shell">
+        <header class="topbar">
+          <button id="burgerBtn" class="icon-round" aria-label="Abrir menú">☰</button>
+          <div>
+            <p class="eyebrow">Carga de productos</p>
+            <h2 id="storeTitle">Tienda BNA</h2>
+          </div>
+          <select id="storeSelect"></select>
+        </header>
 
-  <script src="app.js"></script>
-</body>
+        <div class="toolbar">
+          <button id="addRowBtn" class="secondary-btn">+ Agregar fila</button>
+          <button id="clearBtn" class="ghost-btn">Limpiar formulario</button>
+          <button id="exportBtn" class="primary-btn">Exportar CSV</button>
+        </div>
+
+        <div class="table-wrap">
+          <table id="productTable">
+            <thead><tr id="tableHead"></tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+
+        <footer class="footer">
+          <span>Tienditax</span>
+          <button id="logoutBtn" class="ghost-btn">Cerrar sesión</button>
+        </footer>
+      </main>
+    </section>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
 </html>
