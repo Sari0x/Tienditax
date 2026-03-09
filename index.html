@@ -12,11 +12,9 @@
   </head>
   <body>
     <div id="app">
-      <section id="loginView" class="view active">
+      <section id="loginView" class="view active centered-view">
         <div class="card login-card">
           <img class="brand-logo" src="https://i.postimg.cc/wvwVpYgN/Gemini-Generated-Image-ho93mhho93mhho93-removebg-preview.png" alt="Tienditax logo" />
-          <h1>Tienditax</h1>
-          <p class="subtitle">Accedé para gestionar tus catálogos</p>
           <label>Usuario</label>
           <input id="loginUser" type="text" placeholder="usuario" autocomplete="username" />
           <label>Contraseña</label>
@@ -24,7 +22,7 @@
             <input id="loginPass" type="password" placeholder="contraseña" autocomplete="current-password" />
             <button id="togglePass" type="button" class="link-btn">Ver</button>
           </div>
-          <button id="loginBtn" class="ios-btn primary">Ingresar</button>
+          <button id="loginBtn" class="ios-btn primary login-btn">Ingresar</button>
         </div>
       </section>
 
@@ -35,26 +33,12 @@
         </header>
         <div id="menuDrawer" class="drawer">
           <div class="drawer-content">
-            <h3>Menú</h3>
-            <button id="historialTabBtn" class="ios-btn ghost">Historial</button>
-            <h4>Categorías</h4>
-            <div class="field-row">
-              <select id="categoryStoreSelect"></select>
-              <button id="newStoreBtn" class="ios-btn ghost">Nueva tienda</button>
+            <div class="drawer-header">
+              <h3>Menú</h3>
+              <button id="closeMenuBtn" class="icon-btn close-btn">✕</button>
             </div>
-            <div class="field-row">
-              <input id="catName" placeholder="nombre" />
-              <input id="catId" placeholder="id numérico" type="number" min="0" />
-            </div>
-            <div class="field-row">
-              <button id="addCategoryBtn" class="ios-btn">Agregar</button>
-              <label class="file-upload ios-btn ghost">
-                Importar XLSX
-                <input id="xlsxInput" type="file" accept=".xlsx,.xls" />
-              </label>
-            </div>
-            <div id="categoriesList" class="list"></div>
-            <div id="historyList" class="list hidden"></div>
+            <button id="menuHistorialBtn" class="ios-btn ghost">Historial</button>
+            <button id="menuCategoriesBtn" class="ios-btn ghost">Categorías</button>
           </div>
         </div>
 
@@ -65,7 +49,7 @@
         <header class="topbar">
           <button id="workspaceMenuBtn" class="icon-btn">☰</button>
           <h2 id="workspaceTitle">Tienda</h2>
-          <div>
+          <div class="actions-wrap">
             <button id="clearFormBtn" class="ios-btn ghost small">Limpiar formulario</button>
             <button id="addRowBtn" class="ios-btn small">Agregar producto</button>
             <button id="exportBtn" class="ios-btn primary small">Exportar CSV</button>
@@ -74,26 +58,12 @@
 
         <div id="workspaceDrawer" class="drawer">
           <div class="drawer-content">
-            <h3>Menú</h3>
+            <div class="drawer-header">
+              <h3>Menú</h3>
+              <button id="closeWorkspaceMenuBtn" class="icon-btn close-btn">✕</button>
+            </div>
             <button id="workspaceHistorialBtn" class="ios-btn ghost">Historial</button>
-            <h4>Categorías</h4>
-            <div class="field-row">
-              <select id="workspaceCategoryStoreSelect"></select>
-              <button id="workspaceNewStoreBtn" class="ios-btn ghost">Nueva tienda</button>
-            </div>
-            <div class="field-row">
-              <input id="workspaceCatName" placeholder="nombre" />
-              <input id="workspaceCatId" placeholder="id numérico" type="number" min="0" />
-            </div>
-            <div class="field-row">
-              <button id="workspaceAddCategoryBtn" class="ios-btn">Agregar</button>
-              <label class="file-upload ios-btn ghost">
-                Importar XLSX
-                <input id="workspaceXlsxInput" type="file" accept=".xlsx,.xls" />
-              </label>
-            </div>
-            <div id="workspaceCategoriesList" class="list"></div>
-            <div id="workspaceHistoryList" class="list hidden"></div>
+            <button id="workspaceCategoriesBtn" class="ios-btn ghost">Categorías</button>
           </div>
         </div>
 
@@ -105,12 +75,48 @@
 
         <div id="tableContainer"></div>
       </section>
+
+      <section id="categoriesView" class="view">
+        <header class="topbar">
+          <button id="categoriesBackBtn" class="icon-btn">←</button>
+          <h2>Categorías</h2>
+          <span></span>
+        </header>
+        <div class="card categories-card">
+          <div class="field-row">
+            <select id="categoryStoreSelect"></select>
+            <button id="newStoreBtn" class="ios-btn ghost">Nueva tienda</button>
+          </div>
+          <div class="field-row">
+            <input id="catName" placeholder="nombre" />
+            <input id="catId" placeholder="id numérico" type="number" min="0" />
+          </div>
+          <div class="field-row">
+            <button id="addCategoryBtn" class="ios-btn">Agregar</button>
+            <label class="file-upload ios-btn ghost">
+              Importar XLSX
+              <input id="xlsxInput" type="file" accept=".xlsx,.xls" />
+            </label>
+          </div>
+          <div id="categoriesList" class="list"></div>
+        </div>
+      </section>
     </div>
 
     <footer>
       <span>Tienditax</span>
       <button id="logoutBtn" class="ios-btn ghost small">Cerrar sesión</button>
     </footer>
+
+    <div id="historyModal" class="modal hidden">
+      <div class="modal-card">
+        <div class="drawer-header">
+          <h3>Historial de exports</h3>
+          <button id="closeHistoryModal" class="icon-btn close-btn">✕</button>
+        </div>
+        <div id="historyList" class="list"></div>
+      </div>
+    </div>
 
     <div id="toastContainer"></div>
 

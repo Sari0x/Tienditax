@@ -7,31 +7,24 @@ const stores = [
 const fields = ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU", "BRAND", "ORIGIN_OF_PRODUCT", "stock"];
 const requiredFields = ["Title", "Category", "Price", "Property SKU", "stock"];
 
-let state = {
-  user: null,
-  currentStore: null,
-  categories: {},
-  products: {},
-  history: {},
-  draft: {},
-};
+let state = { user: null, currentStore: null, categories: {}, products: {}, history: {}, draft: {} };
 let table = null;
-
 const $ = (id) => document.getElementById(id);
-const showToast = (msg) => {
-  const t = document.createElement("div");
-  t.className = "toast";
-  t.textContent = msg;
-  $("toastContainer").appendChild(t);
-  setTimeout(() => t.remove(), 2800);
-};
 
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 const dbPost = async (path, data) => (await fetch(`${DB_URL}/${path}.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })).json();
 
+function showToast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  $("toastContainer").appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
 function switchView(viewId) {
-  ["loginView", "storeView", "workspaceView"].forEach((id) => $(id).classList.toggle("active", id === viewId));
+  ["loginView", "storeView", "workspaceView", "categoriesView"].forEach((id) => $(id).classList.toggle("active", id === viewId));
 }
 
 function nowArgentina() {
@@ -51,8 +44,9 @@ function renderStoreButtons() {
   });
 }
 
-function renderCategoryList(targetId, storeKey) {
-  const list = $(targetId);
+function renderCategoryList() {
+  const storeKey = $("categoryStoreSelect").value;
+  const list = $("categoriesList");
   const cats = state.categories[storeKey] || [];
   list.innerHTML = cats.length ? "" : "<p>Sin categorías</p>";
   cats.forEach((cat, idx) => {
@@ -64,54 +58,71 @@ function renderCategoryList(targetId, storeKey) {
       const newId = prompt("Nuevo id", cat.id);
       if (!newName || !/^\d+$/.test(String(newId))) return;
       state.categories[storeKey][idx] = { name: newName, id: Number(newId) };
-      await persistCategories(storeKey);
-      refreshCategoryUi();
+      await dbPut(`categories/${storeKey}`, state.categories[storeKey]);
+      renderCategoryList();
+      showToast("Categoría editada");
     };
     row.querySelector("[data-act='d']").onclick = async () => {
       if (!confirm("¿Eliminar categoría?")) return;
       state.categories[storeKey].splice(idx, 1);
-      await persistCategories(storeKey);
-      refreshCategoryUi();
+      await dbPut(`categories/${storeKey}`, state.categories[storeKey]);
+      renderCategoryList();
+      showToast("Categoría eliminada");
     };
     list.appendChild(row);
   });
 }
 
-function refreshCategoryUi() {
-  const key = state.currentStore || $("categoryStoreSelect").value || "bna";
-  renderCategoryList("categoriesList", $("categoryStoreSelect").value || key);
-  renderCategoryList("workspaceCategoriesList", $("workspaceCategoryStoreSelect").value || key);
+async function addCategory(storeKey, name, id) {
+  if (!name || !/^\d+$/.test(String(id))) return showToast("ID debe ser numérico");
+  state.categories[storeKey] = state.categories[storeKey] || [];
+  state.categories[storeKey].push({ name, id: Number(id) });
+  await dbPut(`categories/${storeKey}`, state.categories[storeKey]);
+  renderCategoryList();
+  showToast("Categoría agregada correctamente");
 }
 
-async function persistCategories(storeKey) {
-  await dbPut(`categories/${storeKey}`, state.categories[storeKey] || []);
+async function importXlsx(file, storeKey) {
+  try {
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    const parsed = rows.filter((r) => r[0] && /^\d+$/.test(String(r[1]))).map((r) => ({ name: String(r[0]), id: Number(r[1]) }));
+    state.categories[storeKey] = [...(state.categories[storeKey] || []), ...parsed];
+    await dbPut(`categories/${storeKey}`, state.categories[storeKey]);
+    renderCategoryList();
+    showToast("Categorías importadas");
+  } catch {
+    showToast("Error al importar XLSX");
+  }
 }
 
 function buildWorkspace() {
   const container = $("tableContainer");
   const draft = state.draft[state.currentStore] || {};
-  container.innerHTML = `<div class='card' style='max-width:none;margin:0;'>${fields.map((f) => `<label>${f}${requiredFields.includes(f) ? " *" : ""}</label><input data-field="${f}" value="${draft[f] || ""}"/>`).join("")}<div style='margin-top:10px;display:flex;gap:8px;'><button id='saveDraftBtn' class='ios-btn ghost'>Guardar borrador</button></div></div><div id='gridWrap' style='margin-top:8px;'></div>`;
+  const formGrid = fields.map((f) => `<div class='field-block'><label>${f}${requiredFields.includes(f) ? " *" : ""}</label><input data-field='${f}' value='${(draft[f] || "").replaceAll("'", "&#39;")}'/></div>`).join("");
+  container.innerHTML = `<div class='form-grid'>${formGrid}</div><div id='gridWrap'></div>`;
+
   fields.forEach((f) => {
     const input = container.querySelector(`[data-field='${f}']`);
     input.oninput = () => {
-      const storeDraft = state.draft[state.currentStore] || {};
-      storeDraft[f] = input.value;
-      state.draft[state.currentStore] = storeDraft;
+      const d = state.draft[state.currentStore] || {};
+      d[f] = input.value;
+      state.draft[state.currentStore] = d;
       localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
-      dbPut(`drafts/${state.user}/${state.currentStore}`, storeDraft);
+      dbPut(`drafts/${state.user}/${state.currentStore}`, d);
       validateForm();
     };
   });
-  $("saveDraftBtn").onclick = () => showToast("Borrador guardado");
+
   renderGrid();
   validateForm();
 }
 
 function getFormData() {
   const obj = {};
-  fields.forEach((f) => {
-    obj[f] = document.querySelector(`#tableContainer [data-field='${f}']`)?.value?.trim() || "";
-  });
+  fields.forEach((f) => { obj[f] = document.querySelector(`#tableContainer [data-field='${f}']`)?.value?.trim() || ""; });
   return obj;
 }
 
@@ -161,32 +172,6 @@ async function selectStore(key) {
   if (remoteDraft) state.draft[key] = remoteDraft;
   switchView("workspaceView");
   buildWorkspace();
-  refreshCategoryUi();
-}
-
-async function addCategory(storeKey, name, id) {
-  if (!name || !/^\d+$/.test(String(id))) return showToast("ID debe ser numérico");
-  state.categories[storeKey] = state.categories[storeKey] || [];
-  state.categories[storeKey].push({ name, id: Number(id) });
-  await persistCategories(storeKey);
-  refreshCategoryUi();
-  showToast("Categoría agregada correctamente");
-}
-
-async function importXlsx(file, storeKey) {
-  try {
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: "array" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    const parsed = rows.filter((r) => r[0] && /^\d+$/.test(String(r[1]))).map((r) => ({ name: String(r[0]), id: Number(r[1]) }));
-    state.categories[storeKey] = [...(state.categories[storeKey] || []), ...parsed];
-    await persistCategories(storeKey);
-    refreshCategoryUi();
-    showToast("Categorías importadas");
-  } catch {
-    showToast("Error al importar XLSX");
-  }
 }
 
 async function exportCsv() {
@@ -197,6 +182,7 @@ async function exportCsv() {
   for (const p of list) {
     if (requiredFields.some((f) => !p[f])) return showToast("No se puede exportar: faltan campos obligatorios");
   }
+
   const csvRows = [fields.join(","), ...list.map((p) => fields.map((f) => `"${(p[f] || "").toString().replaceAll('"', '""')}"`).join(","))];
   const csv = csvRows.join("\n");
   const stamp = nowArgentina();
@@ -208,8 +194,7 @@ async function exportCsv() {
   a.click();
   URL.revokeObjectURL(a.href);
 
-  const record = { user: state.user, createdAt: stamp, store: state.currentStore, filename, csv };
-  await dbPost(`exports/${state.user}`, record);
+  await dbPost(`exports/${state.user}`, { user: state.user, createdAt: stamp, store: state.currentStore, filename, csv });
   showToast("Export generado");
   await loadHistory();
 }
@@ -217,52 +202,50 @@ async function exportCsv() {
 async function loadHistory() {
   const entries = await dbGet(`exports/${state.user}`) || {};
   state.history = entries;
-  ["historyList", "workspaceHistoryList"].forEach((target) => {
-    const box = $(target);
-    box.innerHTML = "";
-    Object.entries(entries).reverse().forEach(([id, h]) => {
-      const row = document.createElement("div");
-      row.className = "list-item";
-      row.innerHTML = `<span>${h.user} - ${h.createdAt} - ${h.filename}</span><button>Descargar</button>`;
-      row.querySelector("button").onclick = () => {
-        const blob = new Blob([h.csv], { type: "text/csv;charset=utf-8;" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = h.filename;
-        a.click();
-      };
-      box.appendChild(row);
-    });
+  const box = $("historyList");
+  box.innerHTML = "";
+  Object.entries(entries).reverse().forEach(([, h]) => {
+    const row = document.createElement("div");
+    row.className = "list-item";
+    row.innerHTML = `<span>${h.user} - ${h.createdAt} - ${h.filename}</span><button class='ios-btn small'>Descargar</button>`;
+    row.querySelector("button").onclick = () => {
+      const blob = new Blob([h.csv], { type: "text/csv;charset=utf-8;" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = h.filename;
+      a.click();
+    };
+    box.appendChild(row);
   });
 }
 
-function toggleHistory(isWorkspace) {
-  const prefix = isWorkspace ? "workspace" : "";
-  const h = $(`${prefix}HistoryList`);
-  const c = $(`${prefix}CategoriesList`);
-  h.classList.toggle("hidden");
-  c.classList.toggle("hidden");
+function openHistoryModal() {
+  $("historyModal").classList.remove("hidden");
+  loadHistory();
+}
+
+function closeAllDrawers() {
+  $("menuDrawer").classList.remove("open");
+  $("workspaceDrawer").classList.remove("open");
 }
 
 async function init() {
   renderStoreButtons();
+
+  const categoriesRemote = await dbGet("categories");
+  if (categoriesRemote) state.categories = categoriesRemote;
+  const allStores = [...new Set([...stores.map((s) => s.key), ...Object.keys(state.categories)])];
+  $("categoryStoreSelect").innerHTML = allStores.map((s) => `<option value='${s}'>${s}</option>`).join("");
+  renderCategoryList();
+
+  state.draft = JSON.parse(localStorage.getItem("ttx_draft") || "{}");
+
   const userFromSession = localStorage.getItem("ttx_user");
   if (userFromSession) {
     state.user = userFromSession;
     switchView("storeView");
+    await loadHistory();
   }
-
-  const allStores = [...stores.map((s) => s.key)];
-  const categoriesRemote = await dbGet("categories");
-  if (categoriesRemote) state.categories = categoriesRemote;
-  Object.keys(state.categories).forEach((k) => { if (!allStores.includes(k)) allStores.push(k); });
-  ["categoryStoreSelect", "workspaceCategoryStoreSelect"].forEach((id) => {
-    $(id).innerHTML = allStores.map((s) => `<option value='${s}'>${s}</option>`).join("");
-  });
-
-  state.draft = JSON.parse(localStorage.getItem("ttx_draft") || "{}");
-  refreshCategoryUi();
-  loadHistory();
 }
 
 $("togglePass").onclick = () => {
@@ -278,38 +261,53 @@ async function doLogin() {
     state.user = user;
     localStorage.setItem("ttx_user", user);
     switchView("storeView");
+    await loadHistory();
     showToast("Bienvenido");
-    loadHistory();
-  } else showToast("Credenciales inválidas");
+  } else {
+    showToast("Credenciales inválidas");
+  }
 }
+
 $("loginBtn").onclick = doLogin;
 $("loginPass").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 $("loginUser").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 
 $("menuBtn").onclick = () => $("menuDrawer").classList.toggle("open");
 $("workspaceMenuBtn").onclick = () => $("workspaceDrawer").classList.toggle("open");
-$("historialTabBtn").onclick = () => toggleHistory(false);
-$("workspaceHistorialBtn").onclick = () => toggleHistory(true);
+$("closeMenuBtn").onclick = closeAllDrawers;
+$("closeWorkspaceMenuBtn").onclick = closeAllDrawers;
+
+$("menuHistorialBtn").onclick = () => { closeAllDrawers(); openHistoryModal(); };
+$("workspaceHistorialBtn").onclick = () => { closeAllDrawers(); openHistoryModal(); };
+
+$("menuCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("categoriesView"); renderCategoryList(); };
+$("workspaceCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("categoriesView"); renderCategoryList(); };
+$("categoriesBackBtn").onclick = () => switchView(state.currentStore ? "workspaceView" : "storeView");
+
+$("closeHistoryModal").onclick = () => $("historyModal").classList.add("hidden");
+$("historyModal").onclick = (e) => { if (e.target.id === "historyModal") $("historyModal").classList.add("hidden"); };
 
 $("newStoreBtn").onclick = () => {
   const name = prompt("Nombre de nueva tienda");
   if (!name) return;
   const key = name.trim().toLowerCase().replaceAll(" ", "_");
+  if (![...$("categoryStoreSelect").options].some((o) => o.value === key)) {
+    const op = document.createElement("option");
+    op.value = key;
+    op.textContent = key;
+    $("categoryStoreSelect").appendChild(op);
+  }
   state.categories[key] = state.categories[key] || [];
-  ["categoryStoreSelect", "workspaceCategoryStoreSelect"].forEach((id) => {
-    const op = document.createElement("option"); op.value = key; op.textContent = key; $(id).appendChild(op);
-  });
+  $("categoryStoreSelect").value = key;
+  renderCategoryList();
   showToast("Nueva tienda creada");
 };
-$("workspaceNewStoreBtn").onclick = $("newStoreBtn").onclick;
 
+$("categoryStoreSelect").onchange = renderCategoryList;
 $("addCategoryBtn").onclick = () => addCategory($("categoryStoreSelect").value, $("catName").value.trim(), $("catId").value.trim());
-$("workspaceAddCategoryBtn").onclick = () => addCategory($("workspaceCategoryStoreSelect").value, $("workspaceCatName").value.trim(), $("workspaceCatId").value.trim());
-$("xlsxInput").onchange = (e) => importXlsx(e.target.files[0], $("categoryStoreSelect").value);
-$("workspaceXlsxInput").onchange = (e) => importXlsx(e.target.files[0], $("workspaceCategoryStoreSelect").value);
-
-$("categoryStoreSelect").onchange = refreshCategoryUi;
-$("workspaceCategoryStoreSelect").onchange = refreshCategoryUi;
+$("xlsxInput").onchange = (e) => {
+  if (e.target.files?.[0]) importXlsx(e.target.files[0], $("categoryStoreSelect").value);
+};
 
 $("addRowBtn").onclick = async () => {
   if (!validateForm()) return showToast("Completá los campos obligatorios");
@@ -358,6 +356,7 @@ $("logoutBtn").onclick = () => {
   state.user = null;
   state.currentStore = null;
   switchView("loginView");
+  closeAllDrawers();
 };
 
 init();
