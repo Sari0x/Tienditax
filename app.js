@@ -325,7 +325,7 @@ function wireEvents() {
       scheduleDraftSave();
       validateRows();
     }
-  });
+  };
 
   document.addEventListener("click", async (e) => {
     const removeBtn = e.target.closest("button[data-remove-row]");
