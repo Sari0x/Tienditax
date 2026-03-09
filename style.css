@@ -255,12 +255,17 @@ tbody td {
   vertical-align: top;
 }
 
+tbody tr {
+  height: 86px;
+}
+
 tbody tr:hover {
   background: #fbfdff;
 }
 
 td input {
   min-width: 170px;
+  min-height: 40px;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 13px;
@@ -307,6 +312,9 @@ td .small-input {
 
 .category-cell {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   min-width: 260px;
 }
 

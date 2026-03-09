@@ -28,9 +28,9 @@ const fields = [
   "ORIGIN_OF_PRODUCT"
 ];
 
-// Categorías tomadas de tu sheet.
-// Podés ampliar este array con el mismo formato si después querés sumar más.
-const categories = [
+// Categorías tomadas de tu sheet base.
+// Si recibís IDs distintos por tienda, podés asignarlos en `categoriesByStore`.
+const baseCategories = [
   { name: "Tecnología", id: "8123" },
   { name: "Tecnología/Tv y Video", id: "8124" },
   { name: "Tecnología/Tv y Video/Accesorios Tv", id: "8125" },
@@ -134,6 +134,16 @@ const categories = [
   { name: "Hogar/Cocina/Racks de cocina", id: "8366" }
 ];
 
+const categoriesByStore = {
+  "Tienda BNA": baseCategories,
+  "Tienda Ciudad": baseCategories,
+  "Tienda Macro": baseCategories
+};
+
+function getCategoriesForCurrentStore() {
+  return categoriesByStore[currentStore] || baseCategories;
+}
+
 function login() {
   const user = document.getElementById("user").value.trim();
   const pass = document.getElementById("pass").value.trim();
@@ -229,6 +239,7 @@ function addRow() {
 }
 
 function createCategorySelector() {
+  const availableCategories = getCategoriesForCurrentStore();
   const wrapper = document.createElement("div");
   wrapper.className = "category-cell";
 
@@ -254,7 +265,7 @@ function createCategorySelector() {
     dropdown.innerHTML = "";
 
     const normalizedTerm = normalizeText(term);
-    const filtered = categories.filter((cat) =>
+    const filtered = availableCategories.filter((cat) =>
       normalizeText(cat.name).includes(normalizedTerm)
     );
 
