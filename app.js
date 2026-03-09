@@ -90,7 +90,7 @@ function renderCategoryList() {
   cats.forEach((cat, idx) => {
     const row = document.createElement("div");
     row.className = "list-item";
-    row.innerHTML = `<span>${cat.name} (#${cat.id})</span><div><button data-act='e'>✏️</button><button data-act='d'>🗑️</button></div>`;
+    row.innerHTML = `<span>${cat.name} (#${cat.id})</span><div class='inline-actions'><button class='icon-action' data-act='e' title='Editar'><i class='bi bi-pencil-square'></i></button><button class='icon-action danger' data-act='d' title='Eliminar'><i class='bi bi-trash3'></i></button></div>`;
     row.querySelector("[data-act='e']").onclick = async () => {
       const name = prompt("Nuevo nombre", cat.name);
       const id = prompt("Nuevo id", cat.id);
@@ -169,7 +169,7 @@ function buildWorkspace() {
       if (field === "Transaction Type") return `<div class='field-block'><label>${field}</label><input class='locked' data-row='${idx}' data-field='${field}' value='purchasable' readonly></div>`;
       return `<div class='field-block'><label>${field}${required}</label><input data-row='${idx}' data-field='${field}' value='${row[field] || ""}'></div>`;
     }).join("");
-    rowBox.innerHTML = `<button class='row-delete-btn' data-del-row='${idx}' title='Eliminar fila'>🗑️</button><div class='row-grid'>${fieldsHtml}</div>`;
+    rowBox.innerHTML = `<button class='row-delete-btn' data-del-row='${idx}' title='Eliminar fila'><i class='bi bi-trash3'></i></button><div class='row-grid'>${fieldsHtml}</div>`;
     wrap.appendChild(rowBox);
   });
 
