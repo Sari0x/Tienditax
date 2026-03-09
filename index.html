@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tienditax</title>
+    <link rel="icon" type="image/png" href="https://i.postimg.cc/wvwVpYgN/Gemini-Generated-Image-ho93mhho93mhho93-removebg-preview.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <section id="loginView" class="view active centered-view">
+        <div class="card login-card">
+          <img class="brand-logo" src="https://i.postimg.cc/wvwVpYgN/Gemini-Generated-Image-ho93mhho93mhho93-removebg-preview.png" alt="Tienditax logo" />
+          <label>Usuario</label>
+          <input id="loginUser" type="text" placeholder="usuario" autocomplete="username" />
+          <label>Contraseña</label>
+          <div class="password-wrap">
+            <input id="loginPass" type="password" placeholder="contraseña" autocomplete="current-password" />
+            <button id="togglePass" type="button" class="link-btn">Mostrar</button>
+          </div>
+          <button id="loginBtn" class="ios-btn primary login-btn">Ingresar</button>
+        </div>
+      </section>
+
+      <section id="storeView" class="view">
+        <header class="topbar">
+          <button id="menuBtn" class="icon-btn">☰</button>
+          <h2>Elegí una tienda</h2>
+        </header>
+        <div id="menuDrawer" class="drawer">
+          <div class="drawer-content">
+            <div class="drawer-header">
+              <h3>Menú</h3>
+              <button id="closeMenuBtn" class="icon-btn close-btn">✕</button>
+            </div>
+            <button id="menuHistorialBtn" class="ios-btn ghost">Historial</button>
+            <button id="menuCategoriesBtn" class="ios-btn ghost">Categorías</button>
+          </div>
+        </div>
+
+        <div id="storeButtons" class="store-grid"></div>
+      </section>
+
+      <section id="workspaceView" class="view">
+        <header class="topbar workspace-topbar">
+          <button id="workspaceMenuBtn" class="icon-btn">☰</button>
+          <div class="title-wrap">
+            <h2 id="workspaceTitle">Tienda</h2>
+            <button id="changeStoreBtn" class="ios-btn primary small change-store-btn">Cambiar de tienda</button>
+          </div>
+          <div class="actions-wrap">
+            <button id="clearFormBtn" class="ios-btn ghost small">Limpiar formulario</button>
+            <button id="addRowBtn" class="ios-btn small">Agregar producto</button>
+            <button id="exportBtn" class="ios-btn primary small">Exportar CSV</button>
+          </div>
+        </header>
+
+        <div id="workspaceDrawer" class="drawer">
+          <div class="drawer-content">
+            <div class="drawer-header">
+              <h3>Menú</h3>
+              <button id="closeWorkspaceMenuBtn" class="icon-btn close-btn">✕</button>
+            </div>
+            <button id="workspaceHistorialBtn" class="ios-btn ghost">Historial</button>
+            <button id="workspaceCategoriesBtn" class="ios-btn ghost">Categorías</button>
+          </div>
+        </div>
+
+        <div class="table-controls">
+          <input id="categorySearch" placeholder="Buscar category id" />
+          <button id="manualCategoryBtn" class="ios-btn ghost small">+ Agregar manualmente</button>
+          <input id="manualCategoryInput" class="hidden" placeholder="ID manual numérico" type="number" min="0" />
+        </div>
+
+        <div id="tableContainer"></div>
+      </section>
+
+      <section id="categoriesView" class="view">
+        <header class="topbar">
+          <button id="categoriesBackBtn" class="icon-btn">←</button>
+          <h2>Categorías</h2>
+          <span></span>
+        </header>
+        <div class="card categories-card">
+          <div class="field-row">
+            <select id="categoryStoreSelect"></select>
+            <button id="newStoreBtn" class="ios-btn ghost">Nueva tienda</button>
+          </div>
+          <div class="field-row">
+            <input id="catName" placeholder="nombre" />
+            <input id="catId" placeholder="id numérico" type="number" min="0" />
+          </div>
+          <div class="field-row">
+            <button id="addCategoryBtn" class="ios-btn">Agregar</button>
+            <label class="file-upload ios-btn ghost">
+              Importar XLSX
+              <input id="xlsxInput" type="file" accept=".xlsx,.xls" />
+            </label>
+          </div>
+          <div id="categoriesList" class="list"></div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <span>Tienditax</span>
+      <button id="logoutBtn" class="ios-btn ghost small">Cerrar sesión</button>
+    </footer>
+
+    <div id="historyModal" class="modal hidden">
+      <div class="modal-card">
+        <div class="drawer-header">
+          <h3>Historial de exports</h3>
+          <button id="closeHistoryModal" class="icon-btn close-btn">✕</button>
+        </div>
+        <div id="historyList" class="list"></div>
+      </div>
+    </div>
+
+    <div id="storeSwitchModal" class="modal hidden">
+      <div class="modal-card small-modal">
+        <div class="drawer-header">
+          <h3>Cambiar de tienda</h3>
+          <button id="closeStoreSwitchModal" class="icon-btn close-btn">✕</button>
+        </div>
+        <div id="storeSwitchList" class="switch-list"></div>
+      </div>
+    </div>
+
+    <div id="toastContainer"></div>
+
+    <template id="storeButtonTemplate">
+      <button class="store-btn">
+        <img alt="logo banco" />
+        <span></span>
+      </button>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
