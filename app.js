@@ -1,420 +1,350 @@
-const ADMIN_USER = "manusario";
-const ADMIN_PASS = "mendoza2799";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, get, set, push, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-let currentStore = "";
-
-const fields = [
-  "Title",
-  "Description",
-  "Category",
-  "Transaction Type",
-  "Manufacturer",
-  "Price",
-  "Price Without Taxes",
-  "Available On",
-  "Sale Price",
-  "Sale Price Without Taxes",
-  "sale_on",
-  "sale_until",
-  "Height",
-  "Length",
-  "Width",
-  "Weight",
-  "Property Quantity",
-  "Property Names",
-  "Property Values",
-  "Property SKU",
-  "BRAND",
-  "ORIGIN_OF_PRODUCT"
-];
-
-// Categorías tomadas de tu sheet base.
-// Si recibís IDs distintos por tienda, podés asignarlos en `categoriesByStore`.
-const baseCategories = [
-  { name: "Tecnología", id: "8123" },
-  { name: "Tecnología/Tv y Video", id: "8124" },
-  { name: "Tecnología/Tv y Video/Accesorios Tv", id: "8125" },
-  { name: "Tecnología/Tv y Video/Soportes", id: "8126" },
-  { name: "Tecnología/Tv y Video/Proyectores", id: "8127" },
-  { name: "Tecnología/Tv y Video/Tv LED y Smart Tv", id: "8128" },
-  { name: "Tecnología/Audio y Sonido", id: "8129" },
-  { name: "Tecnología/Audio y Sonido/Accesorios de audio", id: "8130" },
-  { name: "Tecnología/Audio y Sonido/Auriculares", id: "8131" },
-  { name: "Tecnología/Audio y Sonido/Barras de Sonido", id: "8132" },
-  { name: "Tecnología/Audio y Sonido/Parlantes", id: "8133" },
-  { name: "Tecnología/Audio y Sonido/Radios", id: "8134" },
-  { name: "Tecnología/Celulares y Telefonía", id: "8135" },
-  { name: "Tecnología/Celulares y Telefonía/Accesorios de celulares", id: "8136" },
-  { name: "Tecnología/Celulares y Telefonía/Celulares", id: "8137" },
-  { name: "Tecnología/Celulares y Telefonía/Smartwatch", id: "8138" },
-  { name: "Tecnología/Celulares y Telefonía/Teléfonos", id: "8139" },
-  { name: "Tecnología/Cámaras", id: "8140" },
-  { name: "Tecnología/Cámaras/Accesorios de camaras", id: "8141" },
-  { name: "Tecnología/Cámaras/Cámaras, filmadoras, lentes y drones", id: "8142" },
-  { name: "Tecnología/Cámaras/Cámaras de seguridad", id: "8143" },
-  { name: "Tecnología/Computación", id: "8144" },
-  { name: "Tecnología/Computación/All in one y PC de escritorio", id: "8145" },
-  { name: "Tecnología/Computación/Monitores", id: "8146" },
-  { name: "Tecnología/Computación/Notebooks", id: "8147" },
-  { name: "Tecnología/Computación/Tablets", id: "8149" },
-  { name: "Tecnología/Accesorios de computación", id: "8150" },
-  { name: "Tecnología/Accesorios de computación/Almacenamiento", id: "8151" },
-  { name: "Tecnología/Accesorios de computación/Cables y adaptadores", id: "8152" },
-  { name: "Tecnología/Accesorios de computación/Componentes", id: "8153" },
-  { name: "Tecnología/Accesorios de computación/Conectividad", id: "8154" },
-  { name: "Tecnología/Accesorios de computación/Fundas y soportes", id: "9730" },
-  { name: "Tecnología/Accesorios de computación/Impresoras, scanners y accesorios", id: "8155" },
-  { name: "Tecnología/Accesorios de computación/Mouse", id: "8156" },
-  { name: "Tecnología/Accesorios de computación/Teclados", id: "8157" },
-  { name: "Tecnología/Accesorios de computación/Webcam", id: "8159" },
-  { name: "Tecnología/Consolas y videojuegos", id: "8160" },
-  { name: "Tecnología/Consolas y videojuegos/Accesorios de consolas", id: "8161" },
-  { name: "Tecnología/Consolas y videojuegos/Consolas", id: "8162" },
-  { name: "Tecnología/Consolas y videojuegos/Videojuegos", id: "8163" },
-
-  { name: "Electrodomésticos", id: "467" },
-  { name: "Electrodomésticos/Pequeños cocina", id: "8410" },
-  { name: "Electrodomésticos/Pequeños cocina/Balanzas de cocina", id: "8411" },
-  { name: "Electrodomésticos/Pequeños cocina/Batidoras", id: "8412" },
-  { name: "Electrodomésticos/Pequeños cocina/Cafeteras", id: "8413" },
-  { name: "Electrodomésticos/Pequeños cocina/Jugueras y exprimidores", id: "8414" },
-  { name: "Electrodomésticos/Pequeños cocina/Freidoras", id: "8415" },
-  { name: "Electrodomésticos/Pequeños cocina/Licuadoras", id: "8473" },
-  { name: "Electrodomésticos/Pequeños cocina/Mixers y minipimers", id: "8416" },
-  { name: "Electrodomésticos/Pequeños cocina/Pavas Eléctricas", id: "8417" },
-  { name: "Electrodomésticos/Pequeños cocina/Panquequeras", id: "8418" },
-  { name: "Electrodomésticos/Pequeños cocina/Procesadoras", id: "8419" },
-  { name: "Electrodomésticos/Pequeños cocina/Pochocleras", id: "8420" },
-  { name: "Electrodomésticos/Pequeños cocina/Purificadores de agua", id: "8421" },
-  { name: "Electrodomésticos/Pequeños cocina/Tostadoras y sandwicheras", id: "8422" },
-  { name: "Electrodomésticos/Pequeños cocina/Walferas", id: "8423" },
-  { name: "Electrodomésticos/Pequeños cocina/Yogurteras", id: "8424" },
-  { name: "Electrodomésticos/Pequeños hogar", id: "8425" },
-  { name: "Electrodomésticos/Pequeños hogar/Aspiradoras", id: "8426" },
-  { name: "Electrodomésticos/Pequeños hogar/Lustraspiradoras", id: "8427" },
-  { name: "Electrodomésticos/Pequeños hogar/Maquinas de coser", id: "8428" },
-  { name: "Electrodomésticos/Pequeños hogar/Planchas", id: "8429" },
-  { name: "Electrodomésticos/Pequeños hogar/Otros", id: "8430" },
-  { name: "Electrodomésticos/Hornos y cocinas", id: "492" },
-  { name: "Electrodomésticos/Hornos y cocinas/Anafes", id: "8431" },
-  { name: "Electrodomésticos/Hornos y cocinas/Cocinas y campanas", id: "493" },
-  { name: "Electrodomésticos/Hornos y cocinas/Cocinas electricas y multicocinas", id: "8432" },
-  { name: "Electrodomésticos/Hornos y cocinas/Hornos electricos", id: "8433" },
-  { name: "Electrodomésticos/Hornos y cocinas/Hornos empotrables", id: "8434" },
-  { name: "Electrodomésticos/Hornos y cocinas/Microondas", id: "8435" },
-  { name: "Electrodomésticos/Lavado", id: "500" },
-  { name: "Electrodomésticos/Lavado/Lavarropas", id: "501" },
-  { name: "Electrodomésticos/Lavado/Lavavajillas", id: "502" },
-  { name: "Electrodomésticos/Lavado/Secarropas", id: "503" },
-  { name: "Electrodomésticos/Lavado/Lavasecarropas", id: "9729" },
-  { name: "Electrodomésticos/Climatización", id: "8436" },
-  { name: "Electrodomésticos/Climatización/Aires acondicionados", id: "8437" },
-  { name: "Electrodomésticos/Climatización/Calefaccion electrica", id: "8438" },
-  { name: "Electrodomésticos/Climatización/Calefaccion a gas", id: "8440" },
-  { name: "Electrodomésticos/Climatización/Calefaccion a leña", id: "8441" },
-  { name: "Electrodomésticos/Climatización/Climatizadores", id: "8442" },
-  { name: "Electrodomésticos/Climatización/Purificadores de aire", id: "8443" },
-  { name: "Electrodomésticos/Climatización/Ventiladores", id: "8444" },
-  { name: "Electrodomésticos/Refrigeracion", id: "1735" },
-  { name: "Electrodomésticos/Refrigeracion/Cavas y frigobares", id: "8445" },
-  { name: "Electrodomésticos/Refrigeracion/Freezer", id: "8446" },
-  { name: "Electrodomésticos/Refrigeracion/Heladeras", id: "8447" },
-  { name: "Electrodomésticos/Agua caliente", id: "8448" },
-  { name: "Electrodomésticos/Agua caliente/Calefones", id: "8449" },
-  { name: "Electrodomésticos/Agua caliente/Termotanques", id: "8450" },
-
-  { name: "Hogar", id: "552" },
-  { name: "Hogar/Cocina", id: "573" },
-  { name: "Hogar/Cocina/Alacenas", id: "8360" },
-  { name: "Hogar/Cocina/Bajo mesadas", id: "8361" },
-  { name: "Hogar/Cocina/Cubiertos, vajillas y utensilios", id: "8362" },
-  { name: "Hogar/Cocina/Despenseros y portamicroondas", id: "8363" },
-  { name: "Hogar/Cocina/Jarras, termos, mates y botellas", id: "8364" },
-  { name: "Hogar/Cocina/Mesadas", id: "8365" },
-  { name: "Hogar/Cocina/Racks de cocina", id: "8366" }
-];
-
-const categoriesByStore = {
-  "Tienda BNA": baseCategories,
-  "Tienda Ciudad": baseCategories,
-  "Tienda Macro": baseCategories
+const firebaseConfig = {
+  apiKey: "AIzaSyAQx5ap3mzQzxVnc6vazBRCt2hBljLkGoA",
+  authDomain: "tienditax.firebaseapp.com",
+  databaseURL: "https://tienditax-default-rtdb.firebaseio.com",
+  projectId: "tienditax",
+  storageBucket: "tienditax.firebasestorage.app",
+  messagingSenderId: "647088724989",
+  appId: "1:647088724989:web:edb9c2fb675dfe93e51794",
+  measurementId: "G-KP48K0N9XZ"
 };
 
-function getCategoriesForCurrentStore() {
-  return categoriesByStore[currentStore] || baseCategories;
+const fields = ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU", "BRAND", "ORIGIN_OF_PRODUCT"];
+const requiredFields = ["Title", "Category", "Price", "Property SKU", "Property Quantity"];
+const STORES = ["Tienda BNA", "Tienda Ciudad", "Tienda Macro"];
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+let userSession = null;
+let currentStore = STORES[0];
+let rows = [];
+let autosaveTimer;
+let productGrid;
+let categoriesGrid;
+let historyGrid;
+
+const el = (id) => document.getElementById(id);
+const slugStore = (s) => s.toLowerCase().replace(/\s+/g, "_");
+const sessionKey = (identifier) => String(identifier || "anon").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+const nowArg = () => new Date().toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).replace(" ", "_").replace(/:/g, "-");
+
+function toast(msg, type = "ok") {
+  const t = document.createElement("div");
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  el("toastContainer").appendChild(t);
+  setTimeout(() => t.remove(), 2600);
 }
 
-function login() {
-  const user = document.getElementById("user").value.trim();
-  const pass = document.getElementById("pass").value.trim();
-  const error = document.getElementById("error");
-
-  if (user === ADMIN_USER && pass === ADMIN_PASS) {
-    error.textContent = "";
-    document.getElementById("loginPage").classList.add("hidden");
-    document.getElementById("storePage").classList.remove("hidden");
-  } else {
-    error.textContent = "Usuario o contraseña incorrectos.";
-  }
+function switchPage(logged) {
+  el("loginPage").classList.toggle("hidden", logged);
+  el("appPage").classList.toggle("hidden", !logged);
 }
 
-function logout() {
-  document.getElementById("user").value = "";
-  document.getElementById("pass").value = "";
-  document.getElementById("error").textContent = "";
-
-  document.getElementById("loginPage").classList.remove("hidden");
-  document.getElementById("storePage").classList.add("hidden");
-  document.getElementById("productPage").classList.add("hidden");
-
-  document.getElementById("tableBody").innerHTML = "";
-  currentStore = "";
+async function verifyUserCredentials(usernameInput, passwordInput) {
+  const snap = await get(ref(db, "user"));
+  if (!snap.exists()) return null;
+  const stored = snap.val() || {};
+  if (String(usernameInput || "").trim() !== String(stored.user || "").trim()) return null;
+  if (String(passwordInput || "").trim() !== String(stored.pass || "").trim()) return null;
+  return { id: sessionKey(usernameInput), user: String(usernameInput).trim() };
 }
 
-function openStore(storeName) {
-  currentStore = storeName;
-
-  document.getElementById("storeTitle").textContent = storeName;
-  document.getElementById("storePage").classList.add("hidden");
-  document.getElementById("productPage").classList.remove("hidden");
-
-  const tbody = document.getElementById("tableBody");
-  tbody.innerHTML = "";
-  addRow();
-}
-
-function backToStores() {
-  document.getElementById("productPage").classList.add("hidden");
-  document.getElementById("storePage").classList.remove("hidden");
-  document.getElementById("tableBody").innerHTML = "";
-}
-
-function addRow() {
-  const tbody = document.getElementById("tableBody");
-  const tr = document.createElement("tr");
-
-  fields.forEach((field) => {
-    const td = document.createElement("td");
-
-    if (field === "Category") {
-      td.appendChild(createCategorySelector());
-    } else {
-      const input = document.createElement("input");
-      input.type = getInputType(field);
-      input.placeholder = field;
-      input.setAttribute("data-field", field);
-
-      if (
-        field === "Price" ||
-        field === "Price Without Taxes" ||
-        field === "Sale Price" ||
-        field === "Sale Price Without Taxes" ||
-        field === "Height" ||
-        field === "Length" ||
-        field === "Width" ||
-        field === "Weight" ||
-        field === "Property Quantity"
-      ) {
-        input.classList.add("small-input");
+function renderProductGrid() {
+  const columns = fields.map((field) => ({
+    name: field,
+    formatter: (_, row) => {
+      const rowIdx = row.cells[0]?.data ?? row._cells?.[0]?.data;
+      const value = rows[rowIdx]?.[field] || "";
+      if (field === "Category") {
+        return gridjs.html(`<input class="cat-search cell-input" data-row="${rowIdx}" data-field="${field}" value="${escapeHtml(value)}" placeholder="ID categoría" />`);
       }
-
-      td.appendChild(input);
+      return gridjs.html(`<input class="cell-input" data-row="${rowIdx}" data-field="${field}" value="${escapeHtml(value)}" />`);
     }
-
-    tr.appendChild(td);
+  }));
+  columns.unshift({ name: "#", hidden: true });
+  columns.push({
+    name: "Acción",
+    formatter: (_, row) => {
+      const idx = row.cells[0]?.data ?? row._cells?.[0]?.data;
+      return gridjs.html(`<button class="ghost-btn" data-remove-row="${idx}">Eliminar</button>`);
+    }
   });
 
-  const actionTd = document.createElement("td");
-  const removeBtn = document.createElement("button");
-  removeBtn.textContent = "Eliminar";
-  removeBtn.className = "remove-btn";
-  removeBtn.onclick = function () {
-    tr.remove();
+  const data = rows.map((row, idx) => [idx, ...fields.map(() => ""), ""]);
+  const cfg = { columns, data, sort: false, search: false, pagination: { enabled: true, limit: 8 }, fixedHeader: true, height: "60vh" };
+
+  const wrap = el("productGridWrap");
+  wrap.innerHTML = "";
+  productGrid = new gridjs.Grid(cfg);
+  productGrid.render(wrap);
+
+  setTimeout(applyValidationStyles, 0);
+}
+
+function collectRowsFromInputs() {
+  const next = rows.map(() => ({}));
+  document.querySelectorAll("#productGridWrap .cell-input").forEach((inp) => {
+    const idx = Number(inp.dataset.row);
+    const field = inp.dataset.field;
+    if (!Number.isNaN(idx) && next[idx]) next[idx][field] = inp.value.trim();
+  });
+  rows = next;
+}
+
+function validateRows() {
+  collectRowsFromInputs();
+  let valid = true;
+  const skuCount = {};
+  rows.forEach((r) => { if (r["Property SKU"]) skuCount[r["Property SKU"]] = (skuCount[r["Property SKU"]] || 0) + 1; });
+
+  document.querySelectorAll("#productGridWrap .cell-input").forEach((inp) => {
+    inp.classList.remove("invalid", "warn");
+    const row = rows[Number(inp.dataset.row)] || {};
+    if (requiredFields.includes(inp.dataset.field) && !row[inp.dataset.field]) {
+      inp.classList.add("invalid");
+      valid = false;
+    }
+    if (inp.dataset.field === "Property SKU" && row["Property SKU"] && skuCount[row["Property SKU"]] > 1) {
+      inp.classList.add("warn");
+      valid = false;
+    }
+  });
+  return valid;
+}
+
+function applyValidationStyles() {
+  validateRows();
+}
+
+function scheduleDraftSave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(saveDraft, 450);
+}
+
+async function saveDraft() {
+  if (!userSession) return;
+  collectRowsFromInputs();
+  await set(ref(db, `drafts/${userSession.id}/${slugStore(currentStore)}`), { rows, updatedAt: Date.now() });
+}
+
+async function loadDraft() {
+  const snap = await get(ref(db, `drafts/${userSession.id}/${slugStore(currentStore)}`));
+  rows = snap.exists() && Array.isArray(snap.val().rows) && snap.val().rows.length ? snap.val().rows : [createEmptyRow()];
+  renderProductGrid();
+}
+
+function createEmptyRow() {
+  const r = {};
+  fields.forEach((f) => (r[f] = ""));
+  return r;
+}
+
+function csvEscape(v) {
+  const s = String(v || "");
+  if (s.includes('"')) return `"${s.replaceAll('"', '""')}"`;
+  return /[",\n]/.test(s) ? `"${s}"` : s;
+}
+
+async function exportCSV() {
+  if (!validateRows()) return toast("Corregí campos obligatorios o SKUs duplicados", "error");
+  collectRowsFromInputs();
+  const meaningful = rows.filter((r) => Object.values(r).some(Boolean));
+  if (!meaningful.length) return toast("No hay datos para exportar", "error");
+  const csv = [fields.join(","), ...meaningful.map((r) => fields.map((f) => csvEscape(r[f])).join(","))].join("\n");
+  const fileName = `tienditax_${slugStore(currentStore)}_${nowArg()}.csv`;
+
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+  a.download = fileName;
+  a.click();
+
+  await push(ref(db, `exports/${userSession.id}`), {
+    fileName,
+    user: userSession.user,
+    store: currentStore,
+    generatedAt: nowArg(),
+    timeZone: "America/Argentina/Buenos_Aires",
+    csvBase64: btoa(unescape(encodeURIComponent(csv)))
+  });
+  toast("Export generado");
+}
+
+async function loadCategories() {
+  const snap = await get(ref(db, `categories/${slugStore(currentStore)}`));
+  return snap.exists() ? Object.entries(snap.val()).map(([key, value]) => ({ key, ...value })) : [];
+}
+
+async function renderCategoriesGrid() {
+  const list = await loadCategories();
+  const data = list.map((c) => [c.name, c.id, c.key]);
+  const wrap = el("categoriesGridWrap");
+  wrap.innerHTML = "";
+  categoriesGrid = new gridjs.Grid({
+    columns: ["Nombre", "ID", { name: "Acciones", formatter: (_, row) => gridjs.html(`<button class='ghost-btn' data-edit-cat='${row.cells[2].data}'>Editar</button> <button class='ghost-btn' data-del-cat='${row.cells[2].data}'>Eliminar</button>`) }, { name: "_key", hidden: true }],
+    data,
+    pagination: { enabled: true, limit: 10 },
+    sort: true,
+    search: true
+  });
+  categoriesGrid.render(wrap);
+}
+
+async function addCategory(name, id) {
+  const node = push(ref(db, `categories/${slugStore(currentStore)}`));
+  await set(node, { name: String(name).trim(), id: String(id).trim() });
+  toast("Categoría agregada correctamente");
+}
+
+async function openHistoryModal() {
+  const snap = await get(ref(db, `exports/${userSession.id}`));
+  const list = snap.exists() ? Object.entries(snap.val()).map(([k, v]) => ({ key: k, ...v })).reverse() : [];
+  const wrap = el("historyGridWrap");
+  wrap.innerHTML = "";
+  historyGrid = new gridjs.Grid({
+    columns: ["Archivo", "Usuario", "Fecha", "Zona horaria", "Tienda", { name: "Descargar", formatter: (_, row) => gridjs.html(`<button class='secondary-btn' data-dl='${row.cells[5].data}'>Descargar</button>`) }, { name: "_csv", hidden: true }],
+    data: list.map((r) => [r.fileName, r.user, r.generatedAt, r.timeZone, r.store || "-", r.csvBase64]),
+    pagination: { enabled: true, limit: 8 },
+    search: true
+  });
+  historyGrid.render(wrap);
+  el("historyModal").classList.remove("hidden");
+}
+
+function downloadCsvBase64(base64) {
+  const csv = decodeURIComponent(escape(atob(base64)));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = "export_recuperado.csv";
+  a.click();
+}
+
+function showView(view) {
+  const isProducts = view === "products";
+  el("productView").classList.toggle("hidden", !isProducts);
+  el("categoryView").classList.toggle("hidden", isProducts);
+  el("viewTitle").textContent = isProducts ? "Carga de productos" : "Gestión de categorías";
+}
+
+function wireEvents() {
+  el("togglePassword").onclick = () => {
+    el("pass").type = el("pass").type === "password" ? "text" : "password";
+    el("togglePassword").textContent = el("pass").type === "password" ? "Mostrar" : "Ocultar";
   };
 
-  actionTd.appendChild(removeBtn);
-  tr.appendChild(actionTd);
+  el("loginForm").onsubmit = async (e) => {
+    e.preventDefault();
+    el("error").textContent = "";
+    const session = await verifyUserCredentials(el("user").value, el("pass").value);
+    if (!session) return (el("error").textContent = "Credenciales inválidas");
+    userSession = session;
+    localStorage.setItem("tienditax_session", JSON.stringify(session));
+    switchPage(true);
+    await loadDraft();
+    await renderCategoriesGrid();
+  };
 
-  tbody.appendChild(tr);
-}
+  el("storeSelect").innerHTML = STORES.map((s) => `<option>${s}</option>`).join("");
+  el("storeSelect").onchange = async (e) => {
+    currentStore = e.target.value;
+    await loadDraft();
+    await renderCategoriesGrid();
+  };
 
-function createCategorySelector() {
-  const availableCategories = getCategoriesForCurrentStore();
-  const wrapper = document.createElement("div");
-  wrapper.className = "category-cell";
+  el("burgerBtn").onclick = () => el("drawer").classList.add("open");
+  el("closeDrawer").onclick = () => el("drawer").classList.remove("open");
+  el("goProductsBtn").onclick = () => { showView("products"); el("drawer").classList.remove("open"); };
+  el("goCategoriesBtn").onclick = async () => { showView("categories"); await renderCategoriesGrid(); el("drawer").classList.remove("open"); };
+  el("openHistoryBtn").onclick = async () => { await openHistoryModal(); el("drawer").classList.remove("open"); };
 
-  const searchInput = document.createElement("input");
-  searchInput.type = "text";
-  searchInput.placeholder = "Buscar categoría...";
-  searchInput.className = "category-search";
-  searchInput.autocomplete = "off";
+  el("closeHistoryBtn").onclick = () => el("historyModal").classList.add("hidden");
+  el("historyModal").onclick = (e) => { if (e.target.id === "historyModal") el("historyModal").classList.add("hidden"); };
 
-  const hiddenId = document.createElement("input");
-  hiddenId.type = "hidden";
-  hiddenId.setAttribute("data-field", "Category");
+  el("addRowBtn").onclick = () => { collectRowsFromInputs(); rows.push(createEmptyRow()); renderProductGrid(); scheduleDraftSave(); };
+  el("clearBtn").onclick = async () => { rows = [createEmptyRow()]; renderProductGrid(); await saveDraft(); toast("Formulario limpiado"); };
+  el("exportBtn").onclick = exportCSV;
 
-  const badge = document.createElement("div");
-  badge.className = "category-id-badge";
-  badge.textContent = "ID: —";
+  el("addCategoryBtn").onclick = async () => {
+    if (!el("catNameInput").value || !el("catIdInput").value) return toast("Completá nombre e ID", "error");
+    await addCategory(el("catNameInput").value, el("catIdInput").value);
+    el("catNameInput").value = "";
+    el("catIdInput").value = "";
+    await renderCategoriesGrid();
+  };
 
-  const dropdown = document.createElement("div");
-  dropdown.className = "category-dropdown";
-  dropdown.style.display = "none";
-
-  function renderOptions(term = "") {
-    dropdown.innerHTML = "";
-
-    const normalizedTerm = normalizeText(term);
-    const filtered = availableCategories.filter((cat) =>
-      normalizeText(cat.name).includes(normalizedTerm)
-    );
-
-    if (filtered.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "category-empty";
-      empty.textContent = "No se encontraron categorías.";
-      dropdown.appendChild(empty);
-      dropdown.style.display = "block";
-      return;
+  el("xlsxInput").onchange = async (e) => {
+    try {
+      const file = e.target.files[0];
+      if (!file) return;
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const rowsX = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+      for (const r of rowsX) if (r[0] && r[1]) await addCategory(r[0], r[1]);
+      await renderCategoriesGrid();
+    } catch {
+      toast("Error al importar XLSX", "error");
     }
+  };
 
-    filtered.slice(0, 30).forEach((cat) => {
-      const option = document.createElement("div");
-      option.className = "category-option";
+  el("logoutBtn").onclick = () => {
+    userSession = null;
+    localStorage.removeItem("tienditax_session");
+    switchPage(false);
+  };
 
-      option.innerHTML = `
-        <div class="category-option-name">${escapeHtml(cat.name)}</div>
-        <div class="category-option-id">ID: ${cat.id}</div>
-      `;
-
-      option.addEventListener("click", () => {
-        searchInput.value = cat.name;
-        hiddenId.value = cat.id;
-        badge.textContent = `ID: ${cat.id}`;
-        dropdown.style.display = "none";
-      });
-
-      dropdown.appendChild(option);
-    });
-
-    dropdown.style.display = "block";
-  }
-
-  searchInput.addEventListener("focus", () => {
-    renderOptions(searchInput.value);
-  });
-
-  searchInput.addEventListener("input", () => {
-    hiddenId.value = "";
-    badge.textContent = "ID: —";
-    renderOptions(searchInput.value);
-  });
-
-  document.addEventListener("click", (e) => {
-    if (!wrapper.contains(e.target)) {
-      dropdown.style.display = "none";
+  document.addEventListener("input", (e) => {
+    if (e.target.closest("#productGridWrap .cell-input")) {
+      scheduleDraftSave();
+      validateRows();
     }
   });
 
-  wrapper.appendChild(searchInput);
-  wrapper.appendChild(hiddenId);
-  wrapper.appendChild(badge);
-  wrapper.appendChild(dropdown);
+  document.addEventListener("click", async (e) => {
+    const removeBtn = e.target.closest("button[data-remove-row]");
+    if (removeBtn) {
+      collectRowsFromInputs();
+      rows.splice(Number(removeBtn.dataset.removeRow), 1);
+      if (!rows.length) rows = [createEmptyRow()];
+      renderProductGrid();
+      return saveDraft();
+    }
 
-  return wrapper;
-}
+    const dl = e.target.closest("button[data-dl]");
+    if (dl) return downloadCsvBase64(dl.dataset.dl);
 
-function getInputType(field) {
-  const dateFields = ["Available On", "sale_on", "sale_until"];
-  const numberFields = [
-    "Price",
-    "Price Without Taxes",
-    "Sale Price",
-    "Sale Price Without Taxes",
-    "Height",
-    "Length",
-    "Width",
-    "Weight",
-    "Property Quantity"
-  ];
+    const delCat = e.target.closest("button[data-del-cat]");
+    if (delCat) {
+      if (!confirm("¿Eliminar categoría?")) return;
+      await remove(ref(db, `categories/${slugStore(currentStore)}/${delCat.dataset.delCat}`));
+      return renderCategoriesGrid();
+    }
 
-  if (dateFields.includes(field)) return "date";
-  if (numberFields.includes(field)) return "number";
-  return "text";
-}
-
-function exportCSV() {
-  const rows = [];
-  rows.push([...fields]);
-
-  const tableRows = document.querySelectorAll("#tableBody tr");
-
-  tableRows.forEach((tr) => {
-    const row = [];
-
-    fields.forEach((field) => {
-      let value = "";
-
-      if (field === "Category") {
-        const categoryInput = tr.querySelector('input[data-field="Category"]');
-        value = categoryInput ? categoryInput.value.trim() : "";
-      } else {
-        const input = tr.querySelector(`input[data-field="${field}"]`);
-        value = input ? input.value.trim() : "";
-      }
-
-      row.push(escapeCSV(value));
-    });
-
-    if (row.some((value) => value !== "")) {
-      rows.push(row);
+    const editCat = e.target.closest("button[data-edit-cat]");
+    if (editCat) {
+      const name = prompt("Nuevo nombre:");
+      const id = prompt("Nuevo ID:");
+      if (!name || !id) return;
+      await update(ref(db, `categories/${slugStore(currentStore)}/${editCat.dataset.editCat}`), { name, id });
+      return renderCategoriesGrid();
     }
   });
-
-  if (rows.length === 1) {
-    alert("No hay datos cargados para exportar.");
-    return;
-  }
-
-  const csvContent = rows.map((row) => row.join(",")).join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  const safeStoreName = currentStore.replace(/\s+/g, "_").toLowerCase();
-  link.href = url;
-  link.download = `tienditax_${safeStoreName}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  URL.revokeObjectURL(url);
 }
 
-function escapeCSV(value) {
-  if (value.includes('"')) {
-    value = value.replace(/"/g, '""');
-  }
-
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    value = `"${value}"`;
-  }
-
-  return value;
+async function bootstrapSession() {
+  const raw = localStorage.getItem("tienditax_session");
+  if (!raw) return switchPage(false);
+  userSession = JSON.parse(raw);
+  if (!userSession?.id) return switchPage(false);
+  switchPage(true);
+  await loadDraft();
+  await renderCategoriesGrid();
 }
 
-function normalizeText(text) {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+function escapeHtml(text = "") {
+  return String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-function escapeHtml(text) {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
+wireEvents();
+bootstrapSession();
