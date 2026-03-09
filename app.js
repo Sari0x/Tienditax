@@ -44,6 +44,24 @@ function renderStoreButtons() {
   });
 }
 
+function renderStoreSwitchList() {
+  const list = $("storeSwitchList");
+  if (!list) return;
+  list.innerHTML = "";
+  stores
+    .filter((store) => store.key !== state.currentStore)
+    .forEach((store) => {
+      const btn = document.createElement("button");
+      btn.className = "ios-btn";
+      btn.textContent = store.name;
+      btn.onclick = async () => {
+        $("storeSwitchModal").classList.add("hidden");
+        await selectStore(store.key);
+      };
+      list.appendChild(btn);
+    });
+}
+
 function renderCategoryList() {
   const storeKey = $("categoryStoreSelect").value;
   const list = $("categoriesList");
@@ -172,6 +190,7 @@ async function selectStore(key) {
   if (remoteDraft) state.draft[key] = remoteDraft;
   switchView("workspaceView");
   buildWorkspace();
+  renderStoreSwitchList();
 }
 
 async function exportCsv() {
@@ -250,7 +269,9 @@ async function init() {
 
 $("togglePass").onclick = () => {
   const p = $("loginPass");
-  p.type = p.type === "password" ? "text" : "password";
+  const showing = p.type === "password";
+  p.type = showing ? "text" : "password";
+  $("togglePass").textContent = showing ? "Ocultar" : "Mostrar";
 };
 
 async function doLogin() {
@@ -286,6 +307,13 @@ $("categoriesBackBtn").onclick = () => switchView(state.currentStore ? "workspac
 
 $("closeHistoryModal").onclick = () => $("historyModal").classList.add("hidden");
 $("historyModal").onclick = (e) => { if (e.target.id === "historyModal") $("historyModal").classList.add("hidden"); };
+
+$("changeStoreBtn").onclick = () => {
+  renderStoreSwitchList();
+  $("storeSwitchModal").classList.remove("hidden");
+};
+$("closeStoreSwitchModal").onclick = () => $("storeSwitchModal").classList.add("hidden");
+$("storeSwitchModal").onclick = (e) => { if (e.target.id === "storeSwitchModal") $("storeSwitchModal").classList.add("hidden"); };
 
 $("newStoreBtn").onclick = () => {
   const name = prompt("Nombre de nueva tienda");

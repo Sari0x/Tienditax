@@ -20,7 +20,7 @@
           <label>Contraseña</label>
           <div class="password-wrap">
             <input id="loginPass" type="password" placeholder="contraseña" autocomplete="current-password" />
-            <button id="togglePass" type="button" class="link-btn">Ver</button>
+            <button id="togglePass" type="button" class="link-btn">Mostrar</button>
           </div>
           <button id="loginBtn" class="ios-btn primary login-btn">Ingresar</button>
         </div>
@@ -48,7 +48,10 @@
       <section id="workspaceView" class="view">
         <header class="topbar">
           <button id="workspaceMenuBtn" class="icon-btn">☰</button>
-          <h2 id="workspaceTitle">Tienda</h2>
+          <div class="title-wrap">
+            <h2 id="workspaceTitle">Tienda</h2>
+            <button id="changeStoreBtn" class="ios-btn primary small change-store-btn">Cambiar de tienda</button>
+          </div>
           <div class="actions-wrap">
             <button id="clearFormBtn" class="ios-btn ghost small">Limpiar formulario</button>
             <button id="addRowBtn" class="ios-btn small">Agregar producto</button>
@@ -115,6 +118,16 @@
           <button id="closeHistoryModal" class="icon-btn close-btn">✕</button>
         </div>
         <div id="historyList" class="list"></div>
+      </div>
+    </div>
+
+    <div id="storeSwitchModal" class="modal hidden">
+      <div class="modal-card">
+        <div class="drawer-header">
+          <h3>Cambiar de tienda</h3>
+          <button id="closeStoreSwitchModal" class="icon-btn close-btn">✕</button>
+        </div>
+        <div id="storeSwitchList" class="switch-list"></div>
       </div>
     </div>
 
