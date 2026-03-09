@@ -51,6 +51,7 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .row-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(185px, 185px); gap: 8px; align-items: end; flex: 1; }
 .field-block { display: flex; flex-direction: column; gap: 4px; position: relative; }
 .field-block label { font-size: 12px; color: #475569; }
+.field-error { color: var(--red); font-size: 12px; margin-top: 2px; font-weight: 600; }
 .error-field { border-color: var(--red) !important; }
 .locked { background: #f3f6fc; color: #334155; }
 .suggest-box { position: absolute; top: calc(100% + 2px); left: 0; right: 0; background: #fff; border: 1px solid #cbd5e1; border-radius: 10px; max-height: 160px; overflow: auto; z-index: 30; }
@@ -72,6 +73,7 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .switch-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 footer { height: 58px; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-top: 1px solid #dfe4ee; position: sticky; bottom: 0; }
+.footer-logo { height: 34px; width: auto; }
 #toastContainer { position: fixed; right: 16px; bottom: 72px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
 .toast { background: #1f2937; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; box-shadow: var(--shadow); }
 @media (max-width: 900px) { .workspace-topbar, .topbar { display: flex; flex-wrap: wrap; } .brand-logo { width: 340px; } }

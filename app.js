@@ -221,10 +221,37 @@ function buildWorkspace() {
 
 function validateRows() {
   let ok = true;
+  const skuCount = {};
+  document.querySelectorAll("input[data-field='Property SKU']").forEach((el) => {
+    const v = el.value.trim();
+    if (!v) return;
+    skuCount[v] = (skuCount[v] || 0) + 1;
+  });
+
   document.querySelectorAll("input[data-row]").forEach((el) => {
-    const bad = REQUIRED_FIELDS.includes(el.dataset.field) && !el.value.trim();
+    const field = el.dataset.field;
+    const requiredBad = REQUIRED_FIELDS.includes(field) && !el.value.trim();
+    let duplicateBad = false;
+    if (field === "Property SKU") {
+      const v = el.value.trim();
+      duplicateBad = !!v && skuCount[v] > 1;
+    }
+
+    const bad = requiredBad || duplicateBad;
     el.classList.toggle("error-field", bad);
     if (bad) ok = false;
+
+    const block = el.closest('.field-block');
+    if (block) {
+      let msg = block.querySelector('.field-error');
+      if (!msg) {
+        msg = document.createElement('div');
+        msg.className = 'field-error';
+        block.appendChild(msg);
+      }
+      msg.textContent = duplicateBad ? 'Sku duplicado' : '';
+      msg.classList.toggle('hidden', !duplicateBad);
+    }
   });
   return ok;
 }
@@ -241,7 +268,8 @@ function checkDuplicateSku(rows) {
 }
 
 async function persistRows() {
-  await persistRows();
+  await dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
+  await dbPut(`products/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
 }
 
 async function selectStore(key) {
