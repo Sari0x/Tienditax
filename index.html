@@ -14,9 +14,8 @@
   <body>
     <section id="loginPage" class="page page-center">
       <div class="card login-card">
-        <img class="logo logo-lg" src="https://i.postimg.cc/wvwVpYgN/Gemini-Generated-Image-ho93mhho93mhho93-removebg-preview.png" alt="Tienditax" />
-        <p class="subtitle">Acceso seguro para gestión y exportación de catálogos.</p>
-        <form id="loginForm" class="stack-12">
+        <img class="logo logo-xl" src="https://i.postimg.cc/wvwVpYgN/Gemini-Generated-Image-ho93mhho93mhho93-removebg-preview.png" alt="Tienditax" />
+        <form id="loginForm" class="stack-12" novalidate action="javascript:void(0)">
           <label class="field-label" for="user">Usuario</label>
           <input id="user" type="text" autocomplete="username" required placeholder="usuario" />
           <label class="field-label" for="pass">Contraseña</label>
@@ -94,6 +93,25 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+    <script>
+      (function(){
+        const form=document.getElementById("loginForm");
+        const pass=document.getElementById("pass");
+        const toggle=document.getElementById("togglePassword");
+        if(toggle&&pass){
+          toggle.addEventListener("click",function(){
+            pass.type = pass.type === "password" ? "text" : "password";
+            toggle.textContent = pass.type === "password" ? "Mostrar" : "Ocultar";
+          });
+        }
+        if(form){
+          form.addEventListener("submit",async function(ev){
+            ev.preventDefault();
+            if(typeof window.handleLogin === "function") await window.handleLogin();
+          });
+        }
+      })();
+    </script>
     <script type="module" src="app.js"></script>
   </body>
 </html>

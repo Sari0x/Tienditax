@@ -230,22 +230,23 @@ function showView(view) {
 }
 
 function wireEvents() {
-  el("togglePassword").onclick = () => {
-    el("pass").type = el("pass").type === "password" ? "text" : "password";
-    el("togglePassword").textContent = el("pass").type === "password" ? "Mostrar" : "Ocultar";
+  window.handleLogin = async () => {
+    el("error").textContent = "";
+    try {
+      const session = await verifyUserCredentials(el("user").value, el("pass").value);
+      if (!session) return (el("error").textContent = "Credenciales inválidas");
+      userSession = session;
+      localStorage.setItem("tienditax_session", JSON.stringify(session));
+      switchPage(true);
+      await loadDraft();
+      await renderCategoriesGrid();
+    } catch (err) {
+      console.error(err);
+      el("error").textContent = "No se pudo iniciar sesión";
+    }
   };
 
-  el("loginForm").onsubmit = async (e) => {
-    e.preventDefault();
-    el("error").textContent = "";
-    const session = await verifyUserCredentials(el("user").value, el("pass").value);
-    if (!session) return (el("error").textContent = "Credenciales inválidas");
-    userSession = session;
-    localStorage.setItem("tienditax_session", JSON.stringify(session));
-    switchPage(true);
-    await loadDraft();
-    await renderCategoriesGrid();
-  };
+  el("loginForm").addEventListener("submit", (e) => e.preventDefault());
 
   el("storeSelect").innerHTML = STORES.map((s) => `<option>${s}</option>`).join("");
   el("storeSelect").onchange = async (e) => {

@@ -17,6 +17,7 @@ body { margin: 0; font-family: Inter, system-ui, sans-serif; background: var(--b
 .login-card { width: min(460px, 100%); padding: 28px; text-align: center; }
 .logo { width: 90px; margin: 0 auto 6px; display: block; }
 .logo-lg { width: 180px; margin-bottom: 10px; }
+.logo-xl { width: 240px; margin-bottom: 16px; }
 .subtitle { color: var(--muted); margin: 8px 0 18px; }
 .stack-12 > * + * { margin-top: 12px; }
 .stack-8 > * + * { margin-top: 8px; }
