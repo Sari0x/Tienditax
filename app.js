@@ -43,6 +43,20 @@ const el = (id) => document.getElementById(id);
 const slugStore = (s) => s.toLowerCase().replace(/\s+/g, "_");
 const nowArg = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "medium" }).format(new Date());
 
+
+async function resolveLoginIdentifier(identifier) {
+  const clean = String(identifier || "").trim();
+  if (!clean) return "";
+  if (clean.includes("@")) return clean;
+
+  const usernameSnap = await get(ref(db, `usernames/${clean.toLowerCase()}`));
+  if (usernameSnap.exists()) return String(usernameSnap.val()).trim();
+
+  // Fallback opcional: si no existe mapeo en DB, intentar como email directo
+  // (por ejemplo, si Firebase Auth ya tiene un usuario cuyo email es igual al valor ingresado).
+  return clean;
+}
+
 function toast(msg, type = "ok") {
   const t = document.createElement("div");
   t.className = `toast ${type}`;
@@ -279,7 +293,8 @@ function wireUI() {
     el("error").textContent = "";
     el("loginBtn").disabled = true;
     try {
-      await signInWithEmailAndPassword(auth, el("user").value.trim(), el("pass").value.trim());
+      const loginIdentifier = await resolveLoginIdentifier(el("user").value);
+      await signInWithEmailAndPassword(auth, loginIdentifier, el("pass").value.trim());
     } catch {
       el("error").textContent = "Credenciales inválidas o sin permisos";
     } finally {
