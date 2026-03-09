@@ -50,7 +50,7 @@
           <button id="workspaceMenuBtn" class="icon-btn">☰</button>
           <div class="title-wrap">
             <h2 id="workspaceTitle">Tienda</h2>
-            <button id="changeStoreBtn" class="ios-btn primary small change-store-btn">Cambiar de tienda</button>
+            <button id="changeStoreBtn" class="ios-btn primary small">Cambiar de tienda</button>
           </div>
           <div class="actions-wrap">
             <button id="clearFormBtn" class="ios-btn ghost small">Limpiar filas</button>
@@ -82,7 +82,6 @@
         <div class="card categories-card">
           <div class="field-row">
             <select id="categoryStoreSelect"></select>
-            <button id="newStoreBtn" class="ios-btn ghost">Nueva tienda</button>
           </div>
           <div class="field-row">
             <input id="catName" placeholder="nombre" />
@@ -122,6 +121,16 @@
           <button id="closeStoreSwitchModal" class="icon-btn close-btn">✕</button>
         </div>
         <div id="storeSwitchList" class="switch-list"></div>
+      </div>
+    </div>
+
+    <div id="confirmDeleteModal" class="modal hidden">
+      <div class="modal-card small-modal">
+        <h3>¿Seguro que deseás eliminar la categoría?</h3>
+        <div class="confirm-actions">
+          <button id="confirmDeleteBtn" class="ios-btn success small">Aceptar</button>
+          <button id="cancelDeleteBtn" class="ios-btn danger small">Cancelar</button>
+        </div>
       </div>
     </div>
 

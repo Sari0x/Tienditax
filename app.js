@@ -10,30 +10,35 @@ const STORE_FIELDS = {
   macro: ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU"],
 };
 const REQUIRED_FIELDS = ["Title", "Category", "Price", "Property SKU"];
+const CATEGORY_STORE_OPTIONS = [
+  { key: "bna_ciudad", label: "Tienda bna y ciudad" },
+  { key: "macro", label: "Tienda Macro" },
+];
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, history: {}, draft: {} };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null };
 const $ = (id) => document.getElementById(id);
-
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 const dbPost = async (path, data) => (await fetch(`${DB_URL}/${path}.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })).json();
 
-const showToast = (msg) => {
+function showToast(msg) {
   const t = document.createElement("div");
   t.className = "toast";
   t.textContent = msg;
   $("toastContainer").appendChild(t);
   setTimeout(() => t.remove(), 2500);
-};
-
-const storeFields = () => STORE_FIELDS[state.currentStore] || STORE_FIELDS.bna;
-
+}
 function switchView(viewId) {
   ["loginView", "storeView", "workspaceView", "categoriesView"].forEach((id) => $(id).classList.toggle("active", id === viewId));
 }
-
 function nowArgentina() {
   return new Date().toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).replace(" ", "_").replace(/:/g, "-");
+}
+function categoryBucket(storeKey) {
+  return storeKey === "macro" ? "macro" : "bna_ciudad";
+}
+function storeFields() {
+  return STORE_FIELDS[state.currentStore] || STORE_FIELDS.bna;
 }
 
 function renderStoreButtons() {
@@ -48,7 +53,6 @@ function renderStoreButtons() {
     container.appendChild(node);
   });
 }
-
 function renderStoreSwitchList() {
   const list = $("storeSwitchList");
   list.innerHTML = "";
@@ -64,10 +68,24 @@ function renderStoreSwitchList() {
   });
 }
 
+function renderCategorySelectOptions() {
+  $("categoryStoreSelect").innerHTML = CATEGORY_STORE_OPTIONS.map((o) => `<option value='${o.key}'>${o.label}</option>`).join("");
+}
+
+function openDeleteModal(onAccept) {
+  state.pendingDelete = onAccept;
+  $("confirmDeleteModal").classList.remove("hidden");
+  $("confirmDeleteBtn").focus();
+}
+function closeDeleteModal() {
+  state.pendingDelete = null;
+  $("confirmDeleteModal").classList.add("hidden");
+}
+
 function renderCategoryList() {
-  const storeKey = $("categoryStoreSelect").value;
+  const bucket = $("categoryStoreSelect").value;
   const list = $("categoriesList");
-  const cats = state.categories[storeKey] || [];
+  const cats = state.categories[bucket] || [];
   list.innerHTML = cats.length ? "" : "<p>Sin categorías</p>";
   cats.forEach((cat, idx) => {
     const row = document.createElement("div");
@@ -77,23 +95,24 @@ function renderCategoryList() {
       const name = prompt("Nuevo nombre", cat.name);
       const id = prompt("Nuevo id", cat.id);
       if (!name || !/^\d+$/.test(String(id))) return;
-      state.categories[storeKey][idx] = { name, id: Number(id) };
-      await dbPut(`categories/${storeKey}`, state.categories[storeKey]);
+      state.categories[bucket][idx] = { name, id: Number(id) };
+      await dbPut(`categories/${bucket}`, state.categories[bucket]);
       renderCategoryList();
     };
-    row.querySelector("[data-act='d']").onclick = async () => {
-      if (!confirm("¿Eliminar categoría?")) return;
-      state.categories[storeKey].splice(idx, 1);
-      await dbPut(`categories/${storeKey}`, state.categories[storeKey]);
-      renderCategoryList();
+    row.querySelector("[data-act='d']").onclick = () => {
+      openDeleteModal(async () => {
+        state.categories[bucket].splice(idx, 1);
+        await dbPut(`categories/${bucket}`, state.categories[bucket]);
+        renderCategoryList();
+        showToast("Categoría eliminada");
+      });
     };
     list.appendChild(row);
   });
 }
 
-function categoryDatalist(storeKey, rowIdx) {
-  const cats = state.categories[storeKey] || [];
-  return `<datalist id='cat-list-${rowIdx}'>${cats.map((c) => `<option value='${c.id}'>${c.name}</option>`).join("")}</datalist>`;
+function getCategoriesForCurrentStore() {
+  return state.categories[categoryBucket(state.currentStore)] || [];
 }
 
 function defaultRow() {
@@ -103,8 +122,16 @@ function defaultRow() {
   return row;
 }
 
+function suggestionMarkup(cats, term, rowIdx) {
+  const t = term.toLowerCase();
+  const matches = cats.filter((c) => String(c.id).includes(t) || c.name.toLowerCase().includes(t)).slice(0, 8);
+  if (!matches.length) return "";
+  return `<div class='suggest-box'>${matches.map((c) => `<div class='suggest-item' data-row='${rowIdx}' data-id='${c.id}'>${c.id} - ${c.name}</div>`).join("")}</div>`;
+}
+
 function buildWorkspace() {
   const rows = state.products[state.currentStore] || [defaultRow()];
+  const cats = getCategoriesForCurrentStore();
   const wrap = document.createElement("div");
   wrap.className = "rows-wrap";
 
@@ -114,14 +141,11 @@ function buildWorkspace() {
     const fieldsHtml = storeFields().map((field) => {
       const required = REQUIRED_FIELDS.includes(field) ? " *" : "";
       if (field === "Category") {
-        return `<div class='field-block'><label>Buscar category id${required}</label><input data-row='${idx}' data-field='${field}' list='cat-list-${idx}' value='${row[field] || ""}' placeholder='Buscar category id'>${categoryDatalist(state.currentStore, idx)}</div>`;
+        return `<div class='field-block'><label>Buscar category id${required}</label><input data-row='${idx}' data-field='Category' value='${row.Category || ""}' placeholder='Buscar category id'>${suggestionMarkup(cats, row.Category || "", idx)}</div>`;
       }
-      if (field === "Transaction Type") {
-        return `<div class='field-block'><label>${field}</label><input class='locked' data-row='${idx}' data-field='${field}' value='purchasable' readonly></div>`;
-      }
+      if (field === "Transaction Type") return `<div class='field-block'><label>${field}</label><input class='locked' data-row='${idx}' data-field='${field}' value='purchasable' readonly></div>`;
       return `<div class='field-block'><label>${field}${required}</label><input data-row='${idx}' data-field='${field}' value='${row[field] || ""}'></div>`;
     }).join("");
-
     rowBox.innerHTML = `<div class='row-grid'>${fieldsHtml}</div>`;
     wrap.appendChild(rowBox);
   });
@@ -135,9 +159,19 @@ function buildWorkspace() {
       const r = Number(input.dataset.row);
       const f = input.dataset.field;
       state.products[state.currentStore][r][f] = f === "Transaction Type" ? "purchasable" : input.value;
+      if (f === "Category") buildWorkspace();
       state.draft[state.currentStore] = state.products[state.currentStore];
       localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
       dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
+      validateRows();
+    };
+  });
+  container.querySelectorAll(".suggest-item").forEach((item) => {
+    item.onclick = () => {
+      const rowIdx = Number(item.dataset.row);
+      const catId = item.dataset.id;
+      state.products[state.currentStore][rowIdx].Category = catId;
+      buildWorkspace();
       validateRows();
     };
   });
@@ -148,14 +182,12 @@ function buildWorkspace() {
 function validateRows() {
   let ok = true;
   document.querySelectorAll("input[data-row]").forEach((el) => {
-    const field = el.dataset.field;
-    const bad = REQUIRED_FIELDS.includes(field) && !el.value.trim();
+    const bad = REQUIRED_FIELDS.includes(el.dataset.field) && !el.value.trim();
     el.classList.toggle("error-field", bad);
     if (bad) ok = false;
   });
   return ok;
 }
-
 function checkDuplicateSku(rows) {
   const seen = new Set();
   const dup = new Set();
@@ -191,7 +223,6 @@ async function exportCsv() {
   const csvRows = [headers.join(","), ...rows.map((r) => headers.map((h) => `"${(h === "Transaction Type" ? "purchasable" : (r[h] || "")).toString().replaceAll('"', '""')}"`).join(","))];
   const csv = csvRows.join("\n");
   const filename = `tienditax_${state.currentStore}_${nowArgentina()}.csv`;
-
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -200,7 +231,7 @@ async function exportCsv() {
 
   await dbPost(`exports/${state.user}`, { user: state.user, createdAt: nowArgentina(), store: state.currentStore, filename, csv });
   showToast("Export generado");
-  await loadHistory();
+  loadHistory();
 }
 
 async function loadHistory() {
@@ -222,27 +253,24 @@ async function loadHistory() {
   });
 }
 
-async function addCategory(storeKey, name, id) {
+async function addCategory(bucket, name, id) {
   if (!name || !/^\d+$/.test(String(id))) return showToast("ID debe ser numérico");
-  state.categories[storeKey] = state.categories[storeKey] || [];
-  state.categories[storeKey].push({ name, id: Number(id) });
-  await dbPut(`categories/${storeKey}`, state.categories[storeKey]);
+  state.categories[bucket] = state.categories[bucket] || [];
+  state.categories[bucket].push({ name, id: Number(id) });
+  await dbPut(`categories/${bucket}`, state.categories[bucket]);
   renderCategoryList();
   showToast("Categoría agregada correctamente");
 }
-
-async function importXlsx(file, storeKey) {
+async function importXlsx(file, bucket) {
   try {
     const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
     const parsed = rows.filter((r) => r[0] && /^\d+$/.test(String(r[1]))).map((r) => ({ name: String(r[0]), id: Number(r[1]) }));
-    state.categories[storeKey] = [...(state.categories[storeKey] || []), ...parsed];
-    await dbPut(`categories/${storeKey}`, state.categories[storeKey]);
+    state.categories[bucket] = [...(state.categories[bucket] || []), ...parsed];
+    await dbPut(`categories/${bucket}`, state.categories[bucket]);
     renderCategoryList();
     showToast("Categorías importadas");
-  } catch {
-    showToast("Error al importar XLSX");
-  }
+  } catch { showToast("Error al importar XLSX"); }
 }
 
 function closeAllDrawers() {
@@ -252,10 +280,19 @@ function closeAllDrawers() {
 
 async function init() {
   renderStoreButtons();
+  renderCategorySelectOptions();
+
   const categoriesRemote = await dbGet("categories");
   if (categoriesRemote) state.categories = categoriesRemote;
-  const allStores = [...new Set([...stores.map((s) => s.key), ...Object.keys(state.categories)])];
-  $("categoryStoreSelect").innerHTML = allStores.map((s) => `<option value='${s}'>${s}</option>`).join("");
+  // migración suave de estructura vieja
+  if (!state.categories.bna_ciudad) {
+    state.categories.bna_ciudad = [
+      ...(state.categories.bna || []),
+      ...(state.categories.ciudad || []),
+    ];
+  }
+  if (!state.categories.macro) state.categories.macro = [];
+
   state.draft = JSON.parse(localStorage.getItem("ttx_draft") || "{}");
   renderCategoryList();
 
@@ -263,7 +300,7 @@ async function init() {
   if (userFromSession) {
     state.user = userFromSession;
     switchView("storeView");
-    await loadHistory();
+    loadHistory();
   }
 }
 
@@ -280,7 +317,7 @@ async function doLogin() {
     state.user = remote.user;
     localStorage.setItem("ttx_user", state.user);
     switchView("storeView");
-    await loadHistory();
+    loadHistory();
     showToast("Bienvenido");
   } else showToast("Credenciales inválidas");
 }
@@ -305,32 +342,28 @@ $("categoriesBackBtn").onclick = () => switchView(state.currentStore ? "workspac
 $("changeStoreBtn").onclick = () => { renderStoreSwitchList(); $("storeSwitchModal").classList.remove("hidden"); };
 $("closeStoreSwitchModal").onclick = () => $("storeSwitchModal").classList.add("hidden");
 
-$("newStoreBtn").onclick = () => {
-  const name = prompt("Nombre de nueva tienda");
-  if (!name) return;
-  const key = name.trim().toLowerCase().replaceAll(" ", "_");
-  state.categories[key] = state.categories[key] || [];
-  if (![...$("categoryStoreSelect").options].some((o) => o.value === key)) {
-    const op = document.createElement("option");
-    op.value = key;
-    op.textContent = key;
-    $("categoryStoreSelect").appendChild(op);
-  }
-  $("categoryStoreSelect").value = key;
-  renderCategoryList();
-  showToast("Nueva tienda creada");
-};
-
 $("categoryStoreSelect").onchange = renderCategoryList;
 $("addCategoryBtn").onclick = () => addCategory($("categoryStoreSelect").value, $("catName").value.trim(), $("catId").value.trim());
 $("xlsxInput").onchange = (e) => e.target.files?.[0] && importXlsx(e.target.files[0], $("categoryStoreSelect").value);
+
+$("confirmDeleteBtn").onclick = async () => {
+  if (state.pendingDelete) await state.pendingDelete();
+  closeDeleteModal();
+};
+$("cancelDeleteBtn").onclick = closeDeleteModal;
+window.addEventListener("keydown", async (e) => {
+  if (e.key === "Enter" && !$("confirmDeleteModal").classList.contains("hidden") && state.pendingDelete) {
+    e.preventDefault();
+    await state.pendingDelete();
+    closeDeleteModal();
+  }
+});
 
 $("addRowBtn").onclick = () => {
   state.products[state.currentStore] = state.products[state.currentStore] || [defaultRow()];
   state.products[state.currentStore].push(defaultRow());
   buildWorkspace();
 };
-
 $("clearFormBtn").onclick = async () => {
   state.products[state.currentStore] = [defaultRow()];
   state.draft[state.currentStore] = state.products[state.currentStore];
@@ -339,7 +372,6 @@ $("clearFormBtn").onclick = async () => {
   await dbPut(`products/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
   buildWorkspace();
 };
-
 $("exportBtn").onclick = async () => {
   await dbPut(`products/${state.user}/${state.currentStore}`, state.products[state.currentStore] || [defaultRow()]);
   exportCsv();
