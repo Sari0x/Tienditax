@@ -10,6 +10,7 @@ const STORE_FIELDS = {
   macro: ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU"],
 };
 const REQUIRED_FIELDS = ["Title", "Category", "Price", "Property SKU"];
+const DATE_FIELDS = ["Available On", "sale_on", "sale_until"];
 const CATEGORY_STORE_OPTIONS = [
   { key: "bna_ciudad", label: "Tienda bna y ciudad" },
   { key: "macro", label: "Tienda Macro" },
@@ -248,7 +249,12 @@ function validateRows() {
       duplicateBad = !!v && skuCount[v] > 1;
     }
 
-    const bad = requiredBad || duplicateBad;
+    let dateBad = false;
+    if (DATE_FIELDS.includes(field) && el.value.trim()) {
+      dateBad = !/^\d{4}-\d{2}-\d{2}$/.test(el.value.trim());
+    }
+
+    const bad = requiredBad || duplicateBad || dateBad;
     el.classList.toggle("error-field", bad);
     if (bad) ok = false;
 
@@ -260,8 +266,8 @@ function validateRows() {
         msg.className = 'field-error';
         block.appendChild(msg);
       }
-      msg.textContent = duplicateBad ? 'Sku duplicado' : '';
-      msg.classList.toggle('hidden', !duplicateBad);
+      msg.textContent = duplicateBad ? 'Sku duplicado' : (dateBad ? 'Formato fecha: AAAA-MM-DD' : '');
+      msg.classList.toggle('hidden', !(duplicateBad || dateBad));
     }
   });
   return ok;
