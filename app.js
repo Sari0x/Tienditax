@@ -1,13 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getAuth,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
   getDatabase,
   ref,
   get,
@@ -35,26 +27,30 @@ let currentStore = STORES[0];
 let userSession = null;
 let autosaveTimer;
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getDatabase(app);
-await setPersistence(auth, browserLocalPersistence);
 
 const el = (id) => document.getElementById(id);
 const slugStore = (s) => s.toLowerCase().replace(/\s+/g, "_");
+const sessionKey = (identifier) => String(identifier || "anon").toLowerCase().replace(/[^a-z0-9_-]/g, "_");
 const nowArg = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "medium" }).format(new Date());
 
+async function verifyUserCredentials(usernameInput, passwordInput) {
+  const snap = await get(ref(db, "user"));
+  if (!snap.exists()) return null;
+  const stored = snap.val() || {};
+  const expectedUser = String(stored.user || "").trim();
+  const expectedPass = String(stored.pass || "").trim();
+  const incomingUser = String(usernameInput || "").trim();
+  const incomingPass = String(passwordInput || "").trim();
 
-async function resolveLoginIdentifier(identifier) {
-  const clean = String(identifier || "").trim();
-  if (!clean) return "";
-  if (clean.includes("@")) return clean;
+  if (!incomingUser || !incomingPass) return null;
+  if (incomingUser !== expectedUser) return null;
+  if (incomingPass !== expectedPass) return null;
 
-  const usernameSnap = await get(ref(db, `usernames/${clean.toLowerCase()}`));
-  if (usernameSnap.exists()) return String(usernameSnap.val()).trim();
-
-  // Fallback opcional: si no existe mapeo en DB, intentar como email directo
-  // (por ejemplo, si Firebase Auth ya tiene un usuario cuyo email es igual al valor ingresado).
-  return clean;
+  return {
+    id: sessionKey(incomingUser),
+    user: incomingUser
+  };
 }
 
 function toast(msg, type = "ok") {
@@ -238,8 +234,8 @@ async function exportCSV() {
   a.download = fileName;
   a.click();
 
-  await push(ref(db, `exports/${userSession.uid}`), {
-    user: userSession.email,
+  await push(ref(db, `exports/${userSession.id}`), {
+    user: userSession.user,
     store: currentStore,
     fileName,
     csvBase64: btoa(unescape(encodeURIComponent(csv))),
@@ -251,7 +247,7 @@ async function exportCSV() {
 }
 
 async function loadExportHistory() {
-  const snap = await get(ref(db, `exports/${userSession.uid}`));
+  const snap = await get(ref(db, `exports/${userSession.id}`));
   const list = snap.exists() ? Object.values(snap.val()).reverse() : [];
   el("exportsHistory").innerHTML = list.map((r) => `<div class="export-item"><strong>${escapeHtml(r.fileName)}</strong><br/>${escapeHtml(r.user)}<br/>${escapeHtml(r.generatedAt)} (${r.timeZone})<br/><button class="secondary-btn" data-csv="${r.csvBase64}">Descargar</button></div>`).join("") || "<small>Sin exports aún.</small>";
 }
@@ -259,7 +255,7 @@ async function loadExportHistory() {
 async function saveDraft() {
   if (!userSession) return;
   const rows = collectRows().map((r) => r.data);
-  await set(ref(db, `drafts/${userSession.uid}/${slugStore(currentStore)}`), { store: currentStore, rows, updatedAt: Date.now() });
+  await set(ref(db, `drafts/${userSession.id}/${slugStore(currentStore)}`), { store: currentStore, rows, updatedAt: Date.now() });
 }
 
 function scheduleDraftSave() {
@@ -269,7 +265,7 @@ function scheduleDraftSave() {
 
 async function loadDraft() {
   el("tableBody").innerHTML = "";
-  const snap = await get(ref(db, `drafts/${userSession.uid}/${slugStore(currentStore)}`));
+  const snap = await get(ref(db, `drafts/${userSession.id}/${slugStore(currentStore)}`));
   if (!snap.exists() || !snap.val().rows?.length) return addRow();
   for (const row of snap.val().rows) await addRow(row);
   validateRows();
@@ -277,7 +273,7 @@ async function loadDraft() {
 
 async function clearForm() {
   el("tableBody").innerHTML = "";
-  await set(ref(db, `drafts/${userSession.uid}/${slugStore(currentStore)}`), null);
+  await set(ref(db, `drafts/${userSession.id}/${slugStore(currentStore)}`), null);
   await addRow();
   toast("Formulario limpiado");
 }
@@ -293,8 +289,16 @@ function wireUI() {
     el("error").textContent = "";
     el("loginBtn").disabled = true;
     try {
-      const loginIdentifier = await resolveLoginIdentifier(el("user").value);
-      await signInWithEmailAndPassword(auth, loginIdentifier, el("pass").value.trim());
+      const session = await verifyUserCredentials(el("user").value, el("pass").value);
+      if (!session) throw new Error("invalid_credentials");
+      userSession = session;
+      localStorage.setItem("tienditax_session", JSON.stringify(userSession));
+      switchPage(true);
+      currentStore = el("storeSelect").value || STORES[0];
+      el("storeTitle").textContent = currentStore;
+      await refreshCategoriesPanel();
+      await loadExportHistory();
+      await loadDraft();
     } catch {
       el("error").textContent = "Credenciales inválidas o sin permisos";
     } finally {
@@ -307,7 +311,11 @@ function wireUI() {
   el("addRowBtn").onclick = () => addRow();
   el("exportBtn").onclick = exportCSV;
   el("clearBtn").onclick = clearForm;
-  el("logoutBtn").onclick = () => signOut(auth);
+  el("logoutBtn").onclick = () => {
+    userSession = null;
+    localStorage.removeItem("tienditax_session");
+    switchPage(false);
+  };
 
   const storeOptions = STORES.map((s) => `<option>${s}</option>`).join("");
   el("storeSelect").innerHTML = storeOptions;
@@ -386,19 +394,22 @@ function wireUI() {
   };
 }
 
-onAuthStateChanged(auth, async (user) => {
-  userSession = user;
-  if (!user) return switchPage(false);
+async function bootstrapSession() {
+  const raw = localStorage.getItem("tienditax_session");
+  if (!raw) return switchPage(false);
+  userSession = JSON.parse(raw);
+  if (!userSession?.id) return switchPage(false);
   switchPage(true);
   currentStore = el("storeSelect").value || STORES[0];
   el("storeTitle").textContent = currentStore;
   await refreshCategoriesPanel();
   await loadExportHistory();
   await loadDraft();
-});
+}
 
 function escapeHtml(text = "") {
   return String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
 wireUI();
+bootstrapSession();
