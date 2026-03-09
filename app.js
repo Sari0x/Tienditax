@@ -119,6 +119,10 @@ function defaultRow() {
   const row = {};
   storeFields().forEach((f) => row[f] = "");
   row["Transaction Type"] = "purchasable";
+  if ("Property Values" in row) row["Property Values"] = "TRUE";
+  if ("Property Names" in row) row["Property Names"] = "noproperty";
+  if ("Property Quantity" in row) row["Property Quantity"] = "0";
+  if ("ORIGIN_OF_PRODUCT" in row) row["ORIGIN_OF_PRODUCT"] = "0";
   return row;
 }
 
@@ -167,6 +171,10 @@ function buildWorkspace() {
         return `<div class='field-block'><label>Buscar category id${required}</label><input data-row='${idx}' data-field='Category' value='${row.Category || ""}' placeholder='Buscar category id'><div class='suggest-host hidden'></div></div>`;
       }
       if (field === "Transaction Type") return `<div class='field-block'><label>${field}</label><input class='locked' data-row='${idx}' data-field='${field}' value='purchasable' readonly></div>`;
+      if (field === "ORIGIN_OF_PRODUCT") {
+        const current = row[field] === undefined || row[field] === "" ? "0" : String(row[field]);
+        return `<div class='field-block'><label>${field}</label><select data-row='${idx}' data-field='${field}'><option value='0' ${current === "0" ? "selected" : ""}>0: Nacional</option><option value='1' ${current === "1" ? "selected" : ""}>1: Importado</option><option value='2' ${current === "2" ? "selected" : ""}>2: Ensamblado en Argentina</option></select></div>`;
+      }
       return `<div class='field-block'><label>${field}${required}</label><input data-row='${idx}' data-field='${field}' value='${row[field] || ""}'></div>`;
     }).join("");
     rowBox.innerHTML = `<button class='row-delete-btn' data-del-row='${idx}' title='Eliminar fila'><i class='bi bi-trash3'></i></button><div class='row-grid'>${fieldsHtml}</div>`;
@@ -177,24 +185,27 @@ function buildWorkspace() {
   container.innerHTML = "";
   container.appendChild(wrap);
 
-  container.querySelectorAll("input[data-row]").forEach((input) => {
-    const r = Number(input.dataset.row);
-    const f = input.dataset.field;
+  container.querySelectorAll("input[data-row], select[data-row]").forEach((control) => {
+    const r = Number(control.dataset.row);
+    const f = control.dataset.field;
 
-    input.oninput = () => {
-      state.products[state.currentStore][r][f] = f === "Transaction Type" ? "purchasable" : input.value;
-      if (f === "Category") renderCategorySuggestions(input, r);
+    const sync = () => {
+      state.products[state.currentStore][r][f] = f === "Transaction Type" ? "purchasable" : control.value;
+      if (f === "Category") renderCategorySuggestions(control, r);
       state.draft[state.currentStore] = state.products[state.currentStore];
       localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
       dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
       validateRows();
     };
 
+    control.oninput = sync;
+    control.onchange = sync;
+
     if (f === "Category") {
-      input.onfocus = () => renderCategorySuggestions(input, r);
-      input.onblur = () => {
+      control.onfocus = () => renderCategorySuggestions(control, r);
+      control.onblur = () => {
         setTimeout(() => {
-          const host = input.parentElement.querySelector('.suggest-host');
+          const host = control.parentElement.querySelector('.suggest-host');
           host.innerHTML = '';
           host.classList.add('hidden');
         }, 120);
