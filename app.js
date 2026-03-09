@@ -45,12 +45,28 @@ function switchPage(logged) {
 }
 
 async function verifyUserCredentials(usernameInput, passwordInput) {
-  const snap = await get(ref(db, "user"));
-  if (!snap.exists()) return null;
-  const stored = snap.val() || {};
-  if (String(usernameInput || "").trim() !== String(stored.user || "").trim()) return null;
-  if (String(passwordInput || "").trim() !== String(stored.pass || "").trim()) return null;
-  return { id: sessionKey(usernameInput), user: String(usernameInput).trim() };
+  const incomingUser = String(usernameInput || "").trim();
+  const incomingPass = String(passwordInput || "").trim();
+  if (!incomingUser || !incomingPass) return null;
+
+  let stored = null;
+  try {
+    const res = await fetch("https://tienditax-default-rtdb.firebaseio.com/user.json", { cache: "no-store" });
+    if (res.ok) stored = await res.json();
+  } catch {
+    // fallback below
+  }
+
+  if (!stored) {
+    const snap = await get(ref(db, "user"));
+    if (snap.exists()) stored = snap.val();
+  }
+
+  if (!stored || typeof stored !== "object") return null;
+  if (incomingUser !== String(stored.user || "").trim()) return null;
+  if (incomingPass !== String(stored.pass || "").trim()) return null;
+
+  return { id: sessionKey(incomingUser), user: incomingUser };
 }
 
 function renderProductGrid() {
@@ -246,7 +262,16 @@ function wireEvents() {
     }
   };
 
-  el("loginForm").addEventListener("submit", (e) => e.preventDefault());
+  el("togglePassword").addEventListener("click", () => {
+    const pass = el("pass");
+    pass.type = pass.type === "password" ? "text" : "password";
+    el("togglePassword").textContent = pass.type === "password" ? "Mostrar" : "Ocultar";
+  });
+
+  el("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await window.handleLogin();
+  });
 
   el("storeSelect").innerHTML = STORES.map((s) => `<option>${s}</option>`).join("");
   el("storeSelect").onchange = async (e) => {
