@@ -8,7 +8,6 @@ const fields = ["Title", "Description", "Category", "Transaction Type", "Manufac
 const requiredFields = ["Title", "Category", "Price", "Property SKU", "stock"];
 
 let state = { user: null, currentStore: null, categories: {}, products: {}, history: {}, draft: {} };
-let table = null;
 const $ = (id) => document.getElementById(id);
 
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
@@ -169,16 +168,21 @@ function checkDuplicateSku(list) {
 }
 
 function renderGrid() {
-  const rows = (state.products[state.currentStore] || []).map((p) => fields.map((f) => p[f] || ""));
-  if (table) table.destroy();
-  table = new gridjs.Grid({
-    columns: fields,
-    data: rows,
-    pagination: { limit: 8 },
-    search: true,
-    sort: true,
-    language: { search: { placeholder: "Buscar..." } },
-  }).render($("gridWrap"));
+  const rows = state.products[state.currentStore] || [];
+  const wrap = $("gridWrap");
+  const head = fields.map((f) => `<th>${f}</th>`).join("");
+  const body = rows
+    .map((row) => `<tr>${fields.map((f) => `<td>${(row[f] || "").toString().replaceAll("<", "&lt;")}</td>`).join("")}</tr>`)
+    .join("");
+
+  wrap.innerHTML = `
+    <div class="table-scroll">
+      <table class="table table-sm table-bordered align-middle product-table">
+        <thead class="table-light"><tr>${head}</tr></thead>
+        <tbody>${body || `<tr><td colspan="${fields.length}" class="text-center">Sin productos</td></tr>`}</tbody>
+      </table>
+    </div>
+  `;
 }
 
 async function selectStore(key) {
