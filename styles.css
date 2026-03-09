@@ -45,8 +45,10 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .drawer-header { display: flex; align-items: center; justify-content: space-between; }
 #tableContainer { background: #fff; border-radius: 18px; box-shadow: var(--shadow); padding: 12px; min-height: calc(100vh - 180px); overflow-x: auto; }
 .rows-wrap { display: flex; flex-direction: column; gap: 10px; min-width: max-content; }
-.product-row { border: 1px solid #e3e8f1; border-radius: 14px; padding: 10px; overflow: visible; }
-.row-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(185px, 185px); gap: 8px; align-items: end; }
+.product-row { border: 1px solid #e3e8f1; border-radius: 14px; padding: 10px; overflow: visible; display: flex; align-items: flex-start; gap: 8px; }
+.row-delete-btn { border: none; background: #ffe9e8; color: #c81e1e; border-radius: 10px; width: 34px; height: 34px; cursor: pointer; flex: 0 0 auto; margin-top: 18px; }
+.row-delete-btn:hover { background: #ffd7d4; }
+.row-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(185px, 185px); gap: 8px; align-items: end; flex: 1; }
 .field-block { display: flex; flex-direction: column; gap: 4px; position: relative; }
 .field-block label { font-size: 12px; color: #475569; }
 .error-field { border-color: var(--red) !important; }

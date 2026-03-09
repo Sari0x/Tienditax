@@ -169,7 +169,7 @@ function buildWorkspace() {
       if (field === "Transaction Type") return `<div class='field-block'><label>${field}</label><input class='locked' data-row='${idx}' data-field='${field}' value='purchasable' readonly></div>`;
       return `<div class='field-block'><label>${field}${required}</label><input data-row='${idx}' data-field='${field}' value='${row[field] || ""}'></div>`;
     }).join("");
-    rowBox.innerHTML = `<div class='row-grid'>${fieldsHtml}</div>`;
+    rowBox.innerHTML = `<button class='row-delete-btn' data-del-row='${idx}' title='Eliminar fila'>🗑️</button><div class='row-grid'>${fieldsHtml}</div>`;
     wrap.appendChild(rowBox);
   });
 
@@ -202,6 +202,20 @@ function buildWorkspace() {
     }
   });
 
+  container.querySelectorAll("[data-del-row]").forEach((btn) => {
+    btn.onclick = async () => {
+      const rowIdx = Number(btn.dataset.delRow);
+      const rows = state.products[state.currentStore] || [];
+      rows.splice(rowIdx, 1);
+      if (!rows.length) rows.push(defaultRow());
+      state.products[state.currentStore] = rows;
+      state.draft[state.currentStore] = rows;
+      localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
+      await persistRows();
+      buildWorkspace();
+    };
+  });
+
   validateRows();
 }
 
@@ -224,6 +238,10 @@ function checkDuplicateSku(rows) {
     seen.add(sku);
   });
   return [...dup];
+}
+
+async function persistRows() {
+  await persistRows();
 }
 
 async function selectStore(key) {
@@ -339,8 +357,22 @@ $("togglePass").onclick = () => {
 
 async function doLogin() {
   const remote = await dbGet("user");
-  if ($("loginUser").value.trim() === remote?.user && $("loginPass").value.trim() === String(remote?.pass)) {
-    state.user = remote.user;
+  const inputUser = $("loginUser").value.trim();
+  const inputPass = $("loginPass").value.trim();
+
+  const credentials = [];
+  if (remote?.user && remote?.pass !== undefined) credentials.push({ user: String(remote.user), pass: String(remote.pass) });
+  Object.keys(remote || {}).forEach((k) => {
+    const m = k.match(/^user(\d+)$/);
+    if (!m) return;
+    const idx = m[1];
+    const passKey = `pass${idx}`;
+    if (remote[passKey] !== undefined) credentials.push({ user: String(remote[k]), pass: String(remote[passKey]) });
+  });
+
+  const ok = credentials.find((c) => c.user === inputUser && c.pass === inputPass);
+  if (ok) {
+    state.user = ok.user;
     localStorage.setItem("ttx_user", state.user);
     switchView("storeView");
     loadHistory();
@@ -394,12 +426,11 @@ $("clearFormBtn").onclick = async () => {
   state.products[state.currentStore] = [defaultRow()];
   state.draft[state.currentStore] = state.products[state.currentStore];
   localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
-  await dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
-  await dbPut(`products/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
+  await persistRows();
   buildWorkspace();
 };
 $("exportBtn").onclick = async () => {
-  await dbPut(`products/${state.user}/${state.currentStore}`, state.products[state.currentStore] || [defaultRow()]);
+  await persistRows();
   exportCsv();
 };
 
