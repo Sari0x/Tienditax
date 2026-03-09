@@ -76,8 +76,8 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .small-modal { width: min(420px, 92vw); padding: 14px; }
 .switch-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-footer { height: 58px; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-top: 1px solid #dfe4ee; position: sticky; bottom: 0; }
-.footer-logo { height: 69px; width: auto; }
+footer { height: 92px; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-top: 1px solid #dfe4ee; position: sticky; bottom: 0; }
+.footer-logo { height: 88px; width: auto; }
 #toastContainer { position: fixed; right: 16px; bottom: 72px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
 .toast { background: #1f2937; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; box-shadow: var(--shadow); }
 @media (max-width: 900px) { .workspace-topbar, .topbar { display: flex; flex-wrap: wrap; } .brand-logo { width: 340px; } }
