@@ -122,16 +122,39 @@ function defaultRow() {
   return row;
 }
 
-function suggestionMarkup(cats, term, rowIdx) {
-  const t = term.toLowerCase();
-  const matches = cats.filter((c) => String(c.id).includes(t) || c.name.toLowerCase().includes(t)).slice(0, 8);
-  if (!matches.length) return "";
-  return `<div class='suggest-box'>${matches.map((c) => `<div class='suggest-item' data-row='${rowIdx}' data-id='${c.id}'>${c.id} - ${c.name}</div>`).join("")}</div>`;
+function getCategoryMatches(term) {
+  const cats = getCategoriesForCurrentStore();
+  const t = term.toLowerCase().trim();
+  if (!t) return [];
+  return cats.filter((c) => String(c.id).includes(t) || c.name.toLowerCase().includes(t)).slice(0, 8);
+}
+
+function renderCategorySuggestions(inputEl, rowIdx) {
+  const host = inputEl.parentElement.querySelector(".suggest-host");
+  const matches = getCategoryMatches(inputEl.value || "");
+  if (!matches.length || document.activeElement !== inputEl) {
+    host.innerHTML = "";
+    host.classList.add("hidden");
+    return;
+  }
+  host.innerHTML = `<div class='suggest-box'>${matches.map((c) => `<div class='suggest-item' data-row='${rowIdx}' data-id='${c.id}'>${c.id} - ${c.name}</div>`).join("")}</div>`;
+  host.classList.remove("hidden");
+
+  host.querySelectorAll(".suggest-item").forEach((item) => {
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      const catId = item.dataset.id;
+      state.products[state.currentStore][rowIdx].Category = catId;
+      inputEl.value = catId;
+      host.innerHTML = "";
+      host.classList.add("hidden");
+      validateRows();
+    };
+  });
 }
 
 function buildWorkspace() {
   const rows = state.products[state.currentStore] || [defaultRow()];
-  const cats = getCategoriesForCurrentStore();
   const wrap = document.createElement("div");
   wrap.className = "rows-wrap";
 
@@ -141,7 +164,7 @@ function buildWorkspace() {
     const fieldsHtml = storeFields().map((field) => {
       const required = REQUIRED_FIELDS.includes(field) ? " *" : "";
       if (field === "Category") {
-        return `<div class='field-block'><label>Buscar category id${required}</label><input data-row='${idx}' data-field='Category' value='${row.Category || ""}' placeholder='Buscar category id'>${suggestionMarkup(cats, row.Category || "", idx)}</div>`;
+        return `<div class='field-block'><label>Buscar category id${required}</label><input data-row='${idx}' data-field='Category' value='${row.Category || ""}' placeholder='Buscar category id'><div class='suggest-host hidden'></div></div>`;
       }
       if (field === "Transaction Type") return `<div class='field-block'><label>${field}</label><input class='locked' data-row='${idx}' data-field='${field}' value='purchasable' readonly></div>`;
       return `<div class='field-block'><label>${field}${required}</label><input data-row='${idx}' data-field='${field}' value='${row[field] || ""}'></div>`;
@@ -155,25 +178,28 @@ function buildWorkspace() {
   container.appendChild(wrap);
 
   container.querySelectorAll("input[data-row]").forEach((input) => {
+    const r = Number(input.dataset.row);
+    const f = input.dataset.field;
+
     input.oninput = () => {
-      const r = Number(input.dataset.row);
-      const f = input.dataset.field;
       state.products[state.currentStore][r][f] = f === "Transaction Type" ? "purchasable" : input.value;
-      if (f === "Category") buildWorkspace();
+      if (f === "Category") renderCategorySuggestions(input, r);
       state.draft[state.currentStore] = state.products[state.currentStore];
       localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
       dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
       validateRows();
     };
-  });
-  container.querySelectorAll(".suggest-item").forEach((item) => {
-    item.onclick = () => {
-      const rowIdx = Number(item.dataset.row);
-      const catId = item.dataset.id;
-      state.products[state.currentStore][rowIdx].Category = catId;
-      buildWorkspace();
-      validateRows();
-    };
+
+    if (f === "Category") {
+      input.onfocus = () => renderCategorySuggestions(input, r);
+      input.onblur = () => {
+        setTimeout(() => {
+          const host = input.parentElement.querySelector('.suggest-host');
+          host.innerHTML = '';
+          host.classList.add('hidden');
+        }, 120);
+      };
+    }
   });
 
   validateRows();
