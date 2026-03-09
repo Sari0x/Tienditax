@@ -10,6 +10,7 @@ const STORE_FIELDS = {
   macro: ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU"],
 };
 const REQUIRED_FIELDS = ["Title", "Category", "Price", "Property SKU"];
+const DATE_FIELDS = ["Available On", "sale_on", "sale_until"];
 const CATEGORY_STORE_OPTIONS = [
   { key: "bna_ciudad", label: "Tienda bna y ciudad" },
   { key: "macro", label: "Tienda Macro" },
@@ -171,6 +172,7 @@ function buildWorkspace() {
         return `<div class='field-block'><label>Buscar category id${required}</label><input data-row='${idx}' data-field='Category' value='${row.Category || ""}' placeholder='Buscar category id'><div class='suggest-host hidden'></div></div>`;
       }
       if (field === "Transaction Type") return `<div class='field-block'><label>${field}</label><input class='locked' data-row='${idx}' data-field='${field}' value='purchasable' readonly></div>`;
+      if (DATE_FIELDS.includes(field)) return `<div class='field-block'><label>${field}${required}</label><input type='text' inputmode='numeric' placeholder='AAAA-MM-DD' data-row='${idx}' data-field='${field}' value='${row[field] || ""}'></div>`;
       if (field === "ORIGIN_OF_PRODUCT") {
         const current = row[field] === undefined || row[field] === "" ? "0" : String(row[field]);
         return `<div class='field-block'><label>${field}</label><select data-row='${idx}' data-field='${field}'><option value='0' ${current === "0" ? "selected" : ""}>0: Nacional</option><option value='1' ${current === "1" ? "selected" : ""}>1: Importado</option><option value='2' ${current === "2" ? "selected" : ""}>2: Ensamblado en Argentina</option></select></div>`;
@@ -248,7 +250,12 @@ function validateRows() {
       duplicateBad = !!v && skuCount[v] > 1;
     }
 
-    const bad = requiredBad || duplicateBad;
+    let dateBad = false;
+    if (DATE_FIELDS.includes(field) && el.value.trim()) {
+      dateBad = !/^\d{4}-\d{2}-\d{2}$/.test(el.value.trim());
+    }
+
+    const bad = requiredBad || duplicateBad || dateBad;
     el.classList.toggle("error-field", bad);
     if (bad) ok = false;
 
@@ -260,8 +267,8 @@ function validateRows() {
         msg.className = 'field-error';
         block.appendChild(msg);
       }
-      msg.textContent = duplicateBad ? 'Sku duplicado' : '';
-      msg.classList.toggle('hidden', !duplicateBad);
+      msg.textContent = duplicateBad ? 'Sku duplicado' : (dateBad ? 'Formato fecha: AAAA-MM-DD' : '');
+      msg.classList.toggle('hidden', !(duplicateBad || dateBad));
     }
   });
   return ok;
