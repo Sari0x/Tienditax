@@ -59,6 +59,10 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .suggest-item { padding: 8px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #eef2f7; }
 .suggest-item:last-child { border-bottom: none; }
 .suggest-item:hover { background: #eef6ff; }
+.history-pagination { display: flex; justify-content: center; gap: 8px; margin: 8px 0 12px; flex-wrap: wrap; }
+.page-btn { background: #dce8ff; color: #0a53d0; }
+.page-btn.active { background: #0a53d0; color: #fff; }
+
 .list { background: #f6f8fc; border-radius: 14px; padding: 10px; min-height: 120px; }
 .list-item { padding: 8px; border-bottom: 1px solid #dde3ee; display:flex; justify-content:space-between; align-items:center; gap:6px; }
 .list-item:last-child { border-bottom: none; }
