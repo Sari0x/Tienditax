@@ -32,7 +32,7 @@
       <section id="storeView" class="view">
         <header class="topbar">
           <button id="menuBtn" class="icon-btn">☰</button>
-          <h2>Elegí una tienda</h2>
+          <span></span>
         </header>
         <div id="menuDrawer" class="drawer">
           <div class="drawer-content">
@@ -43,6 +43,8 @@
             </div>
             <button id="menuHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="menuCategoriesBtn" class="ios-btn ghost">Categorías</button>
+            <div class="drawer-spacer"></div>
+            <button id="menuLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
         </div>
         <div id="storeButtons" class="store-grid"></div>
@@ -57,7 +59,6 @@
           </div>
           <div class="actions-wrap">
             <button id="clearFormBtn" class="ios-btn ghost small">Limpiar filas</button>
-            <button id="addRowBtn" class="ios-btn small">Agregar fila</button>
             <button id="exportBtn" class="ios-btn primary small">Exportar CSV</button>
           </div>
         </header>
@@ -71,9 +72,12 @@
             </div>
             <button id="workspaceHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="workspaceCategoriesBtn" class="ios-btn ghost">Categorías</button>
+            <div class="drawer-spacer"></div>
+            <button id="workspaceLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
         </div>
 
+        <div id="tableTopScroll" class="table-top-scroll hidden"><div id="tableTopScrollInner"></div></div>
         <div id="tableContainer"></div>
       </section>
 
@@ -103,9 +107,14 @@
       </section>
     </div>
 
-    <footer>
+    <footer class="hidden">
+      <div id="footerLinksStack" class="footer-links-stack hidden">
+        <a class="footer-link-btn" href="https://api.avenida.com/login" target="_blank" rel="noopener noreferrer">Avenida BNA</a>
+        <a class="footer-link-btn" href="https://api-macro.avenida.com/login" target="_blank" rel="noopener noreferrer">Avenida MACRO</a>
+        <a class="footer-link-btn" href="https://api.avenida.com/login" target="_blank" rel="noopener noreferrer">Avenida CIUDAD</a>
+      </div>
       <img class="footer-logo" src="https://i.postimg.cc/4nkYkDNG/loguito-tienditax.png" alt="Tienditax" />
-      <button id="logoutBtn" class="ios-btn ghost small">Cerrar sesión</button>
+      <div class="footer-spacer"></div>
     </footer>
 
     <div id="historyModal" class="modal hidden">
@@ -141,10 +150,13 @@
 
     <div id="toastContainer"></div>
 
+    <div id="loginLoadingOverlay" class="loading-overlay hidden" aria-hidden="true">
+      <img src="https://i.postimg.cc/fbH7b8Vt/spinner-tienditax.png" alt="Cargando" class="loading-spinner" />
+    </div>
+
     <template id="storeButtonTemplate">
       <button class="store-btn">
-        <img alt="logo banco" />
-        <span></span>
+        <img alt="logo tienda" />
       </button>
     </template>
 
