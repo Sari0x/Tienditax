@@ -32,6 +32,8 @@ function showToast(msg) {
 }
 function switchView(viewId) {
   ["loginView", "storeView", "workspaceView", "categoriesView"].forEach((id) => $(id).classList.toggle("active", id === viewId));
+  const footerLinks = $("footerLinksStack");
+  if (footerLinks) footerLinks.classList.toggle("hidden", viewId === "loginView");
 }
 function nowArgentina() {
   return new Date().toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).replace(" ", "_").replace(/:/g, "-");
@@ -266,19 +268,19 @@ function renderSkuSuggestions(inputEl, rowIdx) {
 
 function syncTopScrollbar() {
   const container = $("tableContainer");
-  const topScroll = container?.querySelector("#tableTopScroll");
-  const topInner = container?.querySelector("#tableTopScrollInner");
+  const topScroll = $("tableTopScroll");
+  const topInner = $("tableTopScrollInner");
   const rowsWrap = container?.querySelector(".rows-wrap");
   if (!container || !topScroll || !topInner || !rowsWrap) return;
-  const fullWidth = rowsWrap.scrollWidth;
+  const fullWidth = Math.max(rowsWrap.scrollWidth, container.scrollWidth);
   topInner.style.width = `${fullWidth}px`;
-  const showTopScroll = fullWidth > container.clientWidth;
+  const showTopScroll = container.scrollWidth > container.clientWidth;
   topScroll.classList.toggle("hidden", !showTopScroll);
 }
 
 function buildWorkspace() {
   const container = $("tableContainer");
-  let topScroll = null;
+  const topScroll = $("tableTopScroll");
   const previousScrollLeft = container?.scrollLeft || 0;
   const previousScrollTop = container?.scrollTop || 0;
   const previousWindowX = window.scrollX;
@@ -317,13 +319,13 @@ function buildWorkspace() {
   topScrollWrap.innerHTML = `<div id="tableTopScrollInner"></div>`;
   container.appendChild(topScrollWrap);
   container.appendChild(wrap);
-  topScroll = topScrollWrap;
   const addRowWrap = document.createElement("div");
   addRowWrap.className = "add-row-inline-wrap";
   addRowWrap.innerHTML = `<button id="addRowInlineBtn" class="add-row-inline-btn" title="Agregar fila">+</button>`;
   container.appendChild(addRowWrap);
 
   syncTopScrollbar();
+  requestAnimationFrame(syncTopScrollbar);
   container.onscroll = () => {
     if (topScroll && topScroll.scrollLeft !== container.scrollLeft) topScroll.scrollLeft = container.scrollLeft;
   };
