@@ -1,8 +1,8 @@
 const DB_URL = "https://tienditax-default-rtdb.firebaseio.com";
 const stores = [
   { key: "bna", name: "Tienda BNA", logo: "https://i.postimg.cc/cCxxCBPq/tienda-bna-logo.png" },
-  { key: "macro", name: "Tienda Macro", logo: "https://i.ibb.co/XfPPnFs0/tienda-macro-logo.png" },
-  { key: "ciudad", name: "Tienda Ciudad", logo: "https://i.ibb.co/3yGTwBCk/tienda-ciudad-logo.png" },
+  { key: "macro", name: "Tienda Macro", logo: "https://i.postimg.cc/MpfJ5LSq/tienda-macro-logo.png" },
+  { key: "ciudad", name: "Tienda Ciudad", logo: "https://i.postimg.cc/rm18JP5d/tienda-ciudad-logo.png" },
 ];
 const STORE_FIELDS = {
   bna: ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU", "BRAND", "ORIGIN_OF_PRODUCT"],
