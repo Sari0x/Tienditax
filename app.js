@@ -16,7 +16,7 @@ const CATEGORY_STORE_OPTIONS = [
   { key: "macro", label: "Tienda Macro" },
 ];
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1 };
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
@@ -287,13 +287,13 @@ function checkDuplicateSku(rows) {
 
 async function persistRows() {
   await dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
-  await dbPut(`products/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
+  await dbPut(`products/${state.currentStore}`, state.products[state.currentStore]);
 }
 
 async function selectStore(key) {
   state.currentStore = key;
   $("workspaceTitle").textContent = stores.find((s) => s.key === key)?.name || key;
-  const remoteProducts = await dbGet(`products/${state.user}/${key}`);
+  const remoteProducts = await dbGet(`products/${key}`);
   const remoteDraft = await dbGet(`drafts/${state.user}/${key}`);
   state.products[key] = Array.isArray(remoteProducts) ? remoteProducts : (Array.isArray(remoteDraft) ? remoteDraft : [defaultRow()]);
   state.draft[key] = state.products[key];
@@ -319,16 +319,46 @@ async function exportCsv() {
   a.download = filename;
   a.click();
 
-  await dbPost(`exports/${state.user}`, { user: state.user, createdAt: nowArgentina(), store: state.currentStore, filename, csv });
+  await dbPost("exports", { user: state.user, createdAt: nowArgentina(), store: state.currentStore, filename, csv });
   showToast("Export generado");
+  state.historyPage = 1;
   loadHistory();
 }
 
 async function loadHistory() {
-  const entries = await dbGet(`exports/${state.user}`) || {};
+  const entries = await dbGet("exports") || {};
+  const history = Object.values(entries).filter(Boolean).reverse();
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(history.length / pageSize));
+  state.historyPage = Math.min(Math.max(state.historyPage, 1), totalPages);
+
+  const pagination = $("historyPagination");
+  pagination.innerHTML = "";
+  if (history.length > pageSize) {
+    for (let page = 1; page <= totalPages; page += 1) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `ios-btn small page-btn ${page === state.historyPage ? "active" : ""}`;
+      btn.textContent = page;
+      btn.onclick = () => {
+        state.historyPage = page;
+        loadHistory();
+      };
+      pagination.appendChild(btn);
+    }
+  }
+
+  const start = (state.historyPage - 1) * pageSize;
+  const pageItems = history.slice(start, start + pageSize);
+
   const box = $("historyList");
   box.innerHTML = "";
-  Object.entries(entries).reverse().forEach(([, h]) => {
+  if (!pageItems.length) {
+    box.innerHTML = "<p>Sin exportaciones registradas</p>";
+    return;
+  }
+
+  pageItems.forEach((h) => {
     const row = document.createElement("div");
     row.className = "list-item";
     row.innerHTML = `<span>${h.user} - ${h.createdAt} - ${h.filename}</span><button class='ios-btn small'>Descargar</button>`;
@@ -435,8 +465,8 @@ $("workspaceMenuBtn").onclick = () => $("workspaceDrawer").classList.toggle("ope
 $("closeMenuBtn").onclick = closeAllDrawers;
 $("closeWorkspaceMenuBtn").onclick = closeAllDrawers;
 
-$("menuHistorialBtn").onclick = () => { closeAllDrawers(); $("historyModal").classList.remove("hidden"); loadHistory(); };
-$("workspaceHistorialBtn").onclick = () => { closeAllDrawers(); $("historyModal").classList.remove("hidden"); loadHistory(); };
+$("menuHistorialBtn").onclick = () => { closeAllDrawers(); state.historyPage = 1; $("historyModal").classList.remove("hidden"); loadHistory(); };
+$("workspaceHistorialBtn").onclick = () => { closeAllDrawers(); state.historyPage = 1; $("historyModal").classList.remove("hidden"); loadHistory(); };
 $("closeHistoryModal").onclick = () => $("historyModal").classList.add("hidden");
 
 $("menuCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("categoriesView"); renderCategoryList(); };
