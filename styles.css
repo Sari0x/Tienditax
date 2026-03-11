@@ -45,6 +45,8 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .drawer-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .drawer-logo { height: 50px; width: auto; }
 #tableContainer { background: #fff; border-radius: 18px; box-shadow: var(--shadow); padding: 12px; min-height: calc(100vh - 180px); overflow-x: auto; }
+.table-top-scroll { overflow-x: auto; overflow-y: hidden; margin-bottom: 8px; background: #fff; border-radius: 12px; box-shadow: var(--shadow); }
+.table-top-scroll > div { height: 14px; }
 .rows-wrap { display: flex; flex-direction: column; gap: 10px; min-width: max-content; }
 
 .add-row-inline-wrap { display: flex; justify-content: center; padding: 12px 0 4px; }

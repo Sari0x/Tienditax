@@ -265,7 +265,25 @@ function renderSkuSuggestions(inputEl, rowIdx) {
   });
 }
 
+function syncTopScrollbar() {
+  const container = $("tableContainer");
+  const topScroll = $("tableTopScroll");
+  const topInner = $("tableTopScrollInner");
+  const rowsWrap = container?.querySelector(".rows-wrap");
+  if (!container || !topScroll || !topInner || !rowsWrap) return;
+  const fullWidth = rowsWrap.scrollWidth;
+  topInner.style.width = `${fullWidth}px`;
+  const showTopScroll = fullWidth > container.clientWidth;
+  topScroll.classList.toggle("hidden", !showTopScroll);
+}
+
 function buildWorkspace() {
+  const container = $("tableContainer");
+  const topScroll = $("tableTopScroll");
+  const previousScrollLeft = container?.scrollLeft || 0;
+  const previousScrollTop = container?.scrollTop || 0;
+  const previousWindowX = window.scrollX;
+  const previousWindowY = window.scrollY;
   const rows = state.products[state.currentStore] || [defaultRow()];
   const wrap = document.createElement("div");
   wrap.className = "rows-wrap";
@@ -293,13 +311,20 @@ function buildWorkspace() {
     wrap.appendChild(rowBox);
   });
 
-  const container = $("tableContainer");
   container.innerHTML = "";
   container.appendChild(wrap);
   const addRowWrap = document.createElement("div");
   addRowWrap.className = "add-row-inline-wrap";
   addRowWrap.innerHTML = `<button id="addRowInlineBtn" class="add-row-inline-btn" title="Agregar fila">+</button>`;
   container.appendChild(addRowWrap);
+
+  syncTopScrollbar();
+  requestAnimationFrame(() => {
+    container.scrollLeft = previousScrollLeft;
+    container.scrollTop = previousScrollTop;
+    if (topScroll) topScroll.scrollLeft = previousScrollLeft;
+    window.scrollTo(previousWindowX, previousWindowY);
+  });
 
   container.querySelectorAll("input[data-row], select[data-row]").forEach((control) => {
     const r = Number(control.dataset.row);
@@ -557,6 +582,19 @@ async function init() {
 
   state.draft = JSON.parse(localStorage.getItem("ttx_draft") || "{}");
   state.skuCatalog = await dbGetAbsolute("https://precios-novogar-default-rtdb.firebaseio.com/ProductosE3porSKU.json") || {};
+
+  const container = $("tableContainer");
+  const topScroll = $("tableTopScroll");
+  if (container && topScroll) {
+    container.addEventListener("scroll", () => {
+      if (topScroll.scrollLeft !== container.scrollLeft) topScroll.scrollLeft = container.scrollLeft;
+    });
+    topScroll.addEventListener("scroll", () => {
+      if (container.scrollLeft !== topScroll.scrollLeft) container.scrollLeft = topScroll.scrollLeft;
+    });
+    window.addEventListener("resize", syncTopScrollbar);
+  }
+
   renderCategoryList();
 
   const userFromSession = localStorage.getItem("ttx_user");
