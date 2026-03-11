@@ -313,6 +313,11 @@ function buildWorkspace() {
   });
 
   container.innerHTML = "";
+  const topScrollWrap = document.createElement("div");
+  topScrollWrap.id = "tableTopScroll";
+  topScrollWrap.className = "table-top-scroll hidden";
+  topScrollWrap.innerHTML = `<div id="tableTopScrollInner"></div>`;
+  container.appendChild(topScrollWrap);
   container.appendChild(wrap);
   const addRowWrap = document.createElement("div");
   addRowWrap.className = "add-row-inline-wrap";
