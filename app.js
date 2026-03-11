@@ -267,8 +267,8 @@ function renderSkuSuggestions(inputEl, rowIdx) {
 
 function syncTopScrollbar() {
   const container = $("tableContainer");
-  const topScroll = $("tableTopScroll");
-  const topInner = $("tableTopScrollInner");
+  const topScroll = container?.querySelector("#tableTopScroll");
+  const topInner = container?.querySelector("#tableTopScrollInner");
   const rowsWrap = container?.querySelector(".rows-wrap");
   if (!container || !topScroll || !topInner || !rowsWrap) return;
   const fullWidth = rowsWrap.scrollWidth;
@@ -279,7 +279,7 @@ function syncTopScrollbar() {
 
 function buildWorkspace() {
   const container = $("tableContainer");
-  const topScroll = $("tableTopScroll");
+  let topScroll = null;
   const previousScrollLeft = container?.scrollLeft || 0;
   const previousScrollTop = container?.scrollTop || 0;
   const previousWindowX = window.scrollX;
@@ -312,13 +312,27 @@ function buildWorkspace() {
   });
 
   container.innerHTML = "";
+  const topScrollWrap = document.createElement("div");
+  topScrollWrap.id = "tableTopScroll";
+  topScrollWrap.className = "table-top-scroll hidden";
+  topScrollWrap.innerHTML = `<div id="tableTopScrollInner"></div>`;
+  container.appendChild(topScrollWrap);
   container.appendChild(wrap);
+  topScroll = topScrollWrap;
   const addRowWrap = document.createElement("div");
   addRowWrap.className = "add-row-inline-wrap";
   addRowWrap.innerHTML = `<button id="addRowInlineBtn" class="add-row-inline-btn" title="Agregar fila">+</button>`;
   container.appendChild(addRowWrap);
 
   syncTopScrollbar();
+  container.onscroll = () => {
+    if (topScroll && topScroll.scrollLeft !== container.scrollLeft) topScroll.scrollLeft = container.scrollLeft;
+  };
+  if (topScroll) {
+    topScroll.onscroll = () => {
+      if (container.scrollLeft !== topScroll.scrollLeft) container.scrollLeft = topScroll.scrollLeft;
+    };
+  }
   requestAnimationFrame(() => {
     container.scrollLeft = previousScrollLeft;
     container.scrollTop = previousScrollTop;
@@ -583,17 +597,7 @@ async function init() {
   state.draft = JSON.parse(localStorage.getItem("ttx_draft") || "{}");
   state.skuCatalog = await dbGetAbsolute("https://precios-novogar-default-rtdb.firebaseio.com/ProductosE3porSKU.json") || {};
 
-  const container = $("tableContainer");
-  const topScroll = $("tableTopScroll");
-  if (container && topScroll) {
-    container.addEventListener("scroll", () => {
-      if (topScroll.scrollLeft !== container.scrollLeft) topScroll.scrollLeft = container.scrollLeft;
-    });
-    topScroll.addEventListener("scroll", () => {
-      if (container.scrollLeft !== topScroll.scrollLeft) container.scrollLeft = topScroll.scrollLeft;
-    });
-    window.addEventListener("resize", syncTopScrollbar);
-  }
+  window.addEventListener("resize", syncTopScrollbar);
 
   renderCategoryList();
 
@@ -693,11 +697,15 @@ $("exportBtn").onclick = async () => {
   exportCsv();
 };
 
-$("logoutBtn").onclick = () => {
+const doLogout = () => {
+  closeAllDrawers();
   localStorage.removeItem("ttx_user");
   state.user = null;
   state.currentStore = null;
   switchView("loginView");
 };
+
+$("menuLogoutBtn").onclick = doLogout;
+$("workspaceLogoutBtn").onclick = doLogout;
 
 init();

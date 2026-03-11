@@ -41,12 +41,15 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .store-btn img { max-width: 130px; max-height: 48px; object-fit: contain; }
 .drawer { position: fixed; top: 0; left: -340px; width: 320px; height: 100vh; background: #fff; z-index: 40; box-shadow: var(--shadow); transition: left .25s ease; }
 .drawer.open { left: 0; }
-.drawer-content { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.drawer-content { padding: 20px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
 .drawer-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .drawer-logo { height: 50px; width: auto; }
+.drawer-spacer { flex: 1; }
+.ios-btn.soft-danger { background: #ffe9e8; color: #c81e1e; }
+.ios-btn.soft-danger:hover { background: #ffd7d4; }
 #tableContainer { background: #fff; border-radius: 18px; box-shadow: var(--shadow); padding: 12px; min-height: calc(100vh - 180px); overflow-x: auto; }
-.table-top-scroll { overflow-x: auto; overflow-y: hidden; margin-bottom: 8px; background: #fff; border-radius: 12px; box-shadow: var(--shadow); }
-.table-top-scroll > div { height: 14px; }
+.table-top-scroll { overflow-x: auto; overflow-y: hidden; margin: 0 0 8px; }
+.table-top-scroll > div { height: 12px; }
 .rows-wrap { display: flex; flex-direction: column; gap: 10px; min-width: max-content; }
 
 .add-row-inline-wrap { display: flex; justify-content: center; padding: 12px 0 4px; }
@@ -100,7 +103,7 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .small-modal { width: min(420px, 92vw); padding: 14px; }
 .switch-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-footer { height: 92px; display: flex; justify-content: space-between; align-items: center; padding: 0 18px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-top: 1px solid #dfe4ee; position: relative; bottom: 0; }
+footer { height: 92px; display: flex; justify-content: center; align-items: center; padding: 0 18px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); border-top: 1px solid #dfe4ee; position: relative; bottom: 0; }
 .footer-logo { height: 80px; width: auto; }
 #toastContainer { position: fixed; right: 16px; bottom: 72px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
 .toast { background: #1f2937; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; box-shadow: var(--shadow); }
