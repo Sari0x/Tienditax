@@ -16,11 +16,12 @@ const CATEGORY_STORE_OPTIONS = [
   { key: "macro", label: "Tienda Macro" },
 ];
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1 };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, skuCatalog: null };
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 const dbPost = async (path, data) => (await fetch(`${DB_URL}/${path}.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })).json();
+const dbGetAbsolute = async (url) => (await fetch(url)).json();
 
 function showToast(msg) {
   const t = document.createElement("div");
@@ -134,6 +135,89 @@ function getCategoryMatches(term) {
   return cats.filter((c) => String(c.id).includes(t) || c.name.toLowerCase().includes(t)).slice(0, 8);
 }
 
+function normalizeSkuValue(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function getSkuMatches(term) {
+  const list = state.skuCatalog ? Object.keys(state.skuCatalog) : [];
+  const t = normalizeSkuValue(term);
+  if (!t) return [];
+  return list.filter((sku) => {
+    const item = state.skuCatalog[sku] || {};
+    return normalizeSkuValue(sku).includes(t) || normalizeSkuValue(item.Code || "").includes(t);
+  }).slice(0, 8);
+}
+
+
+function findSkuKeyByInput(term) {
+  if (!state.skuCatalog) return "";
+  const normalizedTerm = normalizeSkuValue(term);
+  if (!normalizedTerm) return "";
+  return Object.keys(state.skuCatalog).find((key) => {
+    const item = state.skuCatalog[key] || {};
+    const normalizedKey = normalizeSkuValue(key);
+    const normalizedCode = normalizeSkuValue(item.Code || "");
+    return normalizedKey === normalizedTerm || normalizedCode === normalizedTerm;
+  }) || "";
+}
+
+function convertCmToMm(rawValue) {
+  const num = Number(rawValue);
+  if (!Number.isFinite(num)) return "";
+  return String(num * 10);
+}
+
+function removeAccentsText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+function buildDescriptionFromProperties(properties) {
+  if (!properties || typeof properties !== "object") return "";
+  const excludedKeys = new Set(["presale", "item_contact_form", "tiempo_espera"]);
+  const entries = Object.values(properties)
+    .filter((item) => item && typeof item === "object")
+    .map((item) => {
+      const rawKey = String(item.Key || "").trim();
+      const rawValue = String(item.Value || "").trim();
+      if (!rawKey || !rawValue) return "";
+      const cleanKey = removeAccentsText(rawKey.replace(/^_extprop_/i, ""));
+      const cleanValue = removeAccentsText(rawValue);
+      if (!cleanKey || !cleanValue || excludedKeys.has(cleanKey.toLowerCase())) return "";
+      return `${cleanKey}: ${cleanValue}`;
+    })
+    .filter(Boolean);
+  return entries.join(". ") + (entries.length ? "." : "");
+}
+
+function applySkuDataToRow(rowIdx, sku) {
+  const row = state.products[state.currentStore]?.[rowIdx];
+  if (!row || !state.skuCatalog) return;
+  const selectedSku = findSkuKeyByInput(sku);
+  if (!selectedSku) return;
+
+  const data = state.skuCatalog[selectedSku] || {};
+  row["Property SKU"] = data.Code !== undefined && data.Code !== null && String(data.Code).trim() ? String(data.Code).trim() : selectedSku;
+  if (data.Brand !== undefined) {
+    row.Manufacturer = String(data.Brand);
+    if ("BRAND" in row) row.BRAND = String(data.Brand);
+  }
+  if (data.BoxHeight !== undefined) row.Height = convertCmToMm(data.BoxHeight);
+  if (data.BoxLength !== undefined) row.Length = convertCmToMm(data.BoxLength);
+  if (data.BoxWeight !== undefined) row.Weight = String(data.BoxWeight);
+  if (data.BoxWidth !== undefined) row.Width = convertCmToMm(data.BoxWidth);
+  if (data.Name !== undefined) row.Title = removeAccentsText(data.Name);
+
+  const description = buildDescriptionFromProperties(data.Properties);
+  if (description) row.Description = description;
+}
+
 function renderCategorySuggestions(inputEl, rowIdx) {
   const host = inputEl.parentElement.querySelector(".suggest-host");
   const matches = getCategoryMatches(inputEl.value || "");
@@ -158,7 +242,48 @@ function renderCategorySuggestions(inputEl, rowIdx) {
   });
 }
 
+function renderSkuSuggestions(inputEl, rowIdx) {
+  const host = inputEl.parentElement.querySelector(".suggest-host");
+  const matches = getSkuMatches(inputEl.value || "");
+  if (!matches.length || document.activeElement !== inputEl) {
+    host.innerHTML = "";
+    host.classList.add("hidden");
+    return;
+  }
+
+  host.innerHTML = `<div class='suggest-box'>${matches.map((sku) => `<div class='suggest-item' data-row='${rowIdx}' data-sku='${sku}'>${sku}</div>`).join("")}</div>`;
+  host.classList.remove("hidden");
+
+  host.querySelectorAll(".suggest-item").forEach((item) => {
+    item.onmousedown = async (e) => {
+      e.preventDefault();
+      const selectedSku = item.dataset.sku;
+      applySkuDataToRow(rowIdx, selectedSku);
+      buildWorkspace();
+      await persistRows();
+    };
+  });
+}
+
+function syncTopScrollbar() {
+  const container = $("tableContainer");
+  const topScroll = $("tableTopScroll");
+  const topInner = $("tableTopScrollInner");
+  const rowsWrap = container?.querySelector(".rows-wrap");
+  if (!container || !topScroll || !topInner || !rowsWrap) return;
+  const fullWidth = rowsWrap.scrollWidth;
+  topInner.style.width = `${fullWidth}px`;
+  const showTopScroll = fullWidth > container.clientWidth;
+  topScroll.classList.toggle("hidden", !showTopScroll);
+}
+
 function buildWorkspace() {
+  const container = $("tableContainer");
+  const topScroll = $("tableTopScroll");
+  const previousScrollLeft = container?.scrollLeft || 0;
+  const previousScrollTop = container?.scrollTop || 0;
+  const previousWindowX = window.scrollX;
+  const previousWindowY = window.scrollY;
   const rows = state.products[state.currentStore] || [defaultRow()];
   const wrap = document.createElement("div");
   wrap.className = "rows-wrap";
@@ -170,6 +295,9 @@ function buildWorkspace() {
       const required = REQUIRED_FIELDS.includes(field) ? " *" : "";
       if (field === "Category") {
         return `<div class='field-block'><label>Buscar category id${required}</label><input data-row='${idx}' data-field='Category' value='${row.Category || ""}' placeholder='Buscar category id'><div class='suggest-host hidden'></div></div>`;
+      }
+      if (field === "Property SKU") {
+        return `<div class='field-block'><label>${field}${required}</label><input data-row='${idx}' data-field='${field}' value='${row[field] || ""}' placeholder='Buscar SKU'><div class='suggest-host hidden'></div></div>`;
       }
       if (field === "Transaction Type") return `<div class='field-block'><label>${field}</label><input class='locked' data-row='${idx}' data-field='${field}' value='purchasable' readonly></div>`;
       if (DATE_FIELDS.includes(field)) return `<div class='field-block'><label>${field}${required}</label><input type='text' inputmode='numeric' placeholder='AAAA-MM-DD' data-row='${idx}' data-field='${field}' value='${row[field] || ""}'></div>`;
@@ -183,9 +311,20 @@ function buildWorkspace() {
     wrap.appendChild(rowBox);
   });
 
-  const container = $("tableContainer");
   container.innerHTML = "";
   container.appendChild(wrap);
+  const addRowWrap = document.createElement("div");
+  addRowWrap.className = "add-row-inline-wrap";
+  addRowWrap.innerHTML = `<button id="addRowInlineBtn" class="add-row-inline-btn" title="Agregar fila">+</button>`;
+  container.appendChild(addRowWrap);
+
+  syncTopScrollbar();
+  requestAnimationFrame(() => {
+    container.scrollLeft = previousScrollLeft;
+    container.scrollTop = previousScrollTop;
+    if (topScroll) topScroll.scrollLeft = previousScrollLeft;
+    window.scrollTo(previousWindowX, previousWindowY);
+  });
 
   container.querySelectorAll("input[data-row], select[data-row]").forEach((control) => {
     const r = Number(control.dataset.row);
@@ -194,6 +333,14 @@ function buildWorkspace() {
     const sync = () => {
       state.products[state.currentStore][r][f] = f === "Transaction Type" ? "purchasable" : control.value;
       if (f === "Category") renderCategorySuggestions(control, r);
+      if (f === "Property SKU") {
+        renderSkuSuggestions(control, r);
+        const exactSku = findSkuKeyByInput(control.value);
+        if (exactSku) {
+          applySkuDataToRow(r, exactSku);
+          buildWorkspace();
+        }
+      }
       state.draft[state.currentStore] = state.products[state.currentStore];
       localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
       dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
@@ -213,7 +360,27 @@ function buildWorkspace() {
         }, 120);
       };
     }
+
+    if (f === "Property SKU") {
+      control.onfocus = () => renderSkuSuggestions(control, r);
+      control.onblur = () => {
+        setTimeout(async () => {
+          const host = control.parentElement.querySelector('.suggest-host');
+          host.innerHTML = '';
+          host.classList.add('hidden');
+          const exactSku = findSkuKeyByInput(control.value);
+          if (exactSku) {
+            applySkuDataToRow(r, exactSku);
+            buildWorkspace();
+            await persistRows();
+          }
+        }, 120);
+      };
+    }
   });
+
+  const inlineAddBtn = $("addRowInlineBtn");
+  if (inlineAddBtn) inlineAddBtn.onclick = addNewRow;
 
   container.querySelectorAll("[data-del-row]").forEach((btn) => {
     btn.onclick = async () => {
@@ -414,6 +581,20 @@ async function init() {
   if (!state.categories.macro) state.categories.macro = [];
 
   state.draft = JSON.parse(localStorage.getItem("ttx_draft") || "{}");
+  state.skuCatalog = await dbGetAbsolute("https://precios-novogar-default-rtdb.firebaseio.com/ProductosE3porSKU.json") || {};
+
+  const container = $("tableContainer");
+  const topScroll = $("tableTopScroll");
+  if (container && topScroll) {
+    container.addEventListener("scroll", () => {
+      if (topScroll.scrollLeft !== container.scrollLeft) topScroll.scrollLeft = container.scrollLeft;
+    });
+    topScroll.addEventListener("scroll", () => {
+      if (container.scrollLeft !== topScroll.scrollLeft) container.scrollLeft = topScroll.scrollLeft;
+    });
+    window.addEventListener("resize", syncTopScrollbar);
+  }
+
   renderCategoryList();
 
   const userFromSession = localStorage.getItem("ttx_user");
@@ -493,11 +674,13 @@ window.addEventListener("keydown", async (e) => {
   }
 });
 
-$("addRowBtn").onclick = () => {
+function addNewRow() {
   state.products[state.currentStore] = state.products[state.currentStore] || [defaultRow()];
   state.products[state.currentStore].push(defaultRow());
   buildWorkspace();
-};
+}
+
+if ($("addRowBtn")) $("addRowBtn").onclick = addNewRow;
 $("clearFormBtn").onclick = async () => {
   state.products[state.currentStore] = [defaultRow()];
   state.draft[state.currentStore] = state.products[state.currentStore];
