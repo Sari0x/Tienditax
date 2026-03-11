@@ -1,8 +1,8 @@
 const DB_URL = "https://tienditax-default-rtdb.firebaseio.com";
 const stores = [
-  { key: "bna", name: "Tienda BNA", logo: "https://i.ibb.co/jPB2fcMJ/logo-bna.png" },
-  { key: "macro", name: "Tienda Macro", logo: "https://i.ibb.co/vx557jDZ/logo-tienda-macro.webp" },
-  { key: "ciudad", name: "Tienda Ciudad", logo: "https://i.ibb.co/GfKZ8K7h/logo-ciudad.webp" },
+  { key: "bna", name: "Tienda BNA", logo: "https://i.ibb.co/4RMk522C/tienda-bna-logo.png" },
+  { key: "macro", name: "Tienda Macro", logo: "https://i.ibb.co/XfPPnFs0/tienda-macro-logo.png" },
+  { key: "ciudad", name: "Tienda Ciudad", logo: "https://i.ibb.co/3yGTwBCk/tienda-ciudad-logo.png" },
 ];
 const STORE_FIELDS = {
   bna: ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU", "BRAND", "ORIGIN_OF_PRODUCT"],
@@ -50,7 +50,6 @@ function renderStoreButtons() {
   stores.forEach((store) => {
     const node = tpl.content.firstElementChild.cloneNode(true);
     node.querySelector("img").src = store.logo;
-    node.querySelector("span").textContent = store.name;
     node.onclick = () => selectStore(store.key);
     container.appendChild(node);
   });

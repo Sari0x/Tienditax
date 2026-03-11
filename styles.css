@@ -36,8 +36,8 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .icon-btn { width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer; background: #ebf3ff; color: #1b56a8; font-size: 20px; font-weight: 700; }
 .close-btn { width: 36px; height: 36px; font-size: 16px; }
 .store-grid { min-height: 70vh; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 280px)); place-content: center; gap: 20px; }
-.store-btn { width: 100%; height: 150px; border-radius: 24px; border: none; background: #fff; box-shadow: var(--shadow); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: transform .25s ease; }
-.store-btn:hover { transform: translateY(-6px); box-shadow: none; }
+.store-btn { width: 100%; height: 150px; border-radius: 24px; border: none; background: #fff; box-shadow: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: transform .25s ease; }
+.store-btn:hover { transform: scale(1.05); box-shadow: none; }
 .store-btn img { max-width: 130px; max-height: 48px; object-fit: contain; }
 .drawer { position: fixed; top: 0; left: -340px; width: 320px; height: 100vh; background: #fff; z-index: 40; box-shadow: var(--shadow); transition: left .25s ease; }
 .drawer.open { left: 0; }
@@ -48,7 +48,7 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .ios-btn.soft-danger { background: #ffe9e8; color: #c81e1e; }
 .ios-btn.soft-danger:hover { background: #ffd7d4; }
 #tableContainer { background: #fff; border-radius: 18px; box-shadow: var(--shadow); padding: 12px; min-height: calc(100vh - 180px); overflow-x: auto; }
-.table-top-scroll { overflow-x: auto; overflow-y: hidden; margin: 0 0 8px; }
+.table-top-scroll { overflow-x: auto; overflow-y: hidden; margin: 0 0 8px; width: 100%; min-width: 100%; box-sizing: border-box; }
 .table-top-scroll > div { height: 12px; }
 .rows-wrap { display: flex; flex-direction: column; gap: 10px; min-width: max-content; }
 
