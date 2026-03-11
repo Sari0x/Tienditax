@@ -46,6 +46,24 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .drawer-logo { height: 50px; width: auto; }
 #tableContainer { background: #fff; border-radius: 18px; box-shadow: var(--shadow); padding: 12px; min-height: calc(100vh - 180px); overflow-x: auto; }
 .rows-wrap { display: flex; flex-direction: column; gap: 10px; min-width: max-content; }
+
+.add-row-inline-wrap { display: flex; justify-content: center; padding: 12px 0 4px; }
+.add-row-inline-btn {
+  border: none;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  width: 44px;
+  height: 32px;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.add-row-inline-btn:hover { transform: translateY(-1px); }
 .product-row { border: 1px solid #e3e8f1; border-radius: 14px; padding: 10px; overflow: visible; display: flex; align-items: flex-start; gap: 8px; }
 .row-delete-btn { border: none; background: #ffe9e8; color: #c81e1e; border-radius: 10px; width: 34px; height: 34px; cursor: pointer; flex: 0 0 auto; margin-top: 18px; }
 .row-delete-btn:hover { background: #ffd7d4; }

@@ -172,6 +172,12 @@ function convertCmToMm(rawValue) {
   return String(num * 10);
 }
 
+function removeAccentsText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
 function buildDescriptionFromProperties(properties) {
   if (!properties || typeof properties !== "object") return "";
   const excludedKeys = new Set(["presale", "item_contact_form", "tiempo_espera"]);
@@ -181,9 +187,10 @@ function buildDescriptionFromProperties(properties) {
       const rawKey = String(item.Key || "").trim();
       const rawValue = String(item.Value || "").trim();
       if (!rawKey || !rawValue) return "";
-      const cleanKey = rawKey.replace(/^_extprop_/i, "");
-      if (!cleanKey || excludedKeys.has(cleanKey.toLowerCase())) return "";
-      return `${cleanKey}: ${rawValue}`;
+      const cleanKey = removeAccentsText(rawKey.replace(/^_extprop_/i, ""));
+      const cleanValue = removeAccentsText(rawValue);
+      if (!cleanKey || !cleanValue || excludedKeys.has(cleanKey.toLowerCase())) return "";
+      return `${cleanKey}: ${cleanValue}`;
     })
     .filter(Boolean);
   return entries.join(". ") + (entries.length ? "." : "");
@@ -205,7 +212,7 @@ function applySkuDataToRow(rowIdx, sku) {
   if (data.BoxLength !== undefined) row.Length = convertCmToMm(data.BoxLength);
   if (data.BoxWeight !== undefined) row.Weight = String(data.BoxWeight);
   if (data.BoxWidth !== undefined) row.Width = convertCmToMm(data.BoxWidth);
-  if (data.Name !== undefined) row.Title = String(data.Name);
+  if (data.Name !== undefined) row.Title = removeAccentsText(data.Name);
 
   const description = buildDescriptionFromProperties(data.Properties);
   if (description) row.Description = description;
@@ -289,6 +296,10 @@ function buildWorkspace() {
   const container = $("tableContainer");
   container.innerHTML = "";
   container.appendChild(wrap);
+  const addRowWrap = document.createElement("div");
+  addRowWrap.className = "add-row-inline-wrap";
+  addRowWrap.innerHTML = `<button id="addRowInlineBtn" class="add-row-inline-btn" title="Agregar fila">+</button>`;
+  container.appendChild(addRowWrap);
 
   container.querySelectorAll("input[data-row], select[data-row]").forEach((control) => {
     const r = Number(control.dataset.row);
@@ -342,6 +353,9 @@ function buildWorkspace() {
       };
     }
   });
+
+  const inlineAddBtn = $("addRowInlineBtn");
+  if (inlineAddBtn) inlineAddBtn.onclick = addNewRow;
 
   container.querySelectorAll("[data-del-row]").forEach((btn) => {
     btn.onclick = async () => {
@@ -622,11 +636,13 @@ window.addEventListener("keydown", async (e) => {
   }
 });
 
-$("addRowBtn").onclick = () => {
+function addNewRow() {
   state.products[state.currentStore] = state.products[state.currentStore] || [defaultRow()];
   state.products[state.currentStore].push(defaultRow());
   buildWorkspace();
-};
+}
+
+if ($("addRowBtn")) $("addRowBtn").onclick = addNewRow;
 $("clearFormBtn").onclick = async () => {
   state.products[state.currentStore] = [defaultRow()];
   state.draft[state.currentStore] = state.products[state.currentStore];
