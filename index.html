@@ -32,7 +32,7 @@
       <section id="storeView" class="view">
         <header class="topbar">
           <button id="menuBtn" class="icon-btn">☰</button>
-          <h2>Elegí una tienda</h2>
+          <span></span>
         </header>
         <div id="menuDrawer" class="drawer">
           <div class="drawer-content">
@@ -43,6 +43,8 @@
             </div>
             <button id="menuHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="menuCategoriesBtn" class="ios-btn ghost">Categorías</button>
+            <div class="drawer-spacer"></div>
+            <button id="menuLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
         </div>
         <div id="storeButtons" class="store-grid"></div>
@@ -57,7 +59,6 @@
           </div>
           <div class="actions-wrap">
             <button id="clearFormBtn" class="ios-btn ghost small">Limpiar filas</button>
-            <button id="addRowBtn" class="ios-btn small">Agregar fila</button>
             <button id="exportBtn" class="ios-btn primary small">Exportar CSV</button>
           </div>
         </header>
@@ -71,6 +72,8 @@
             </div>
             <button id="workspaceHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="workspaceCategoriesBtn" class="ios-btn ghost">Categorías</button>
+            <div class="drawer-spacer"></div>
+            <button id="workspaceLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
         </div>
 
@@ -105,7 +108,6 @@
 
     <footer>
       <img class="footer-logo" src="https://i.postimg.cc/4nkYkDNG/loguito-tienditax.png" alt="Tienditax" />
-      <button id="logoutBtn" class="ios-btn ghost small">Cerrar sesión</button>
     </footer>
 
     <div id="historyModal" class="modal hidden">
