@@ -1,8 +1,8 @@
 const DB_URL = "https://tienditax-default-rtdb.firebaseio.com";
 const stores = [
-  { key: "bna", name: "Tienda BNA", logo: "https://i.postimg.cc/cCxxCBPq/tienda-bna-logo.png" },
-  { key: "macro", name: "Tienda Macro", logo: "https://i.postimg.cc/MpfJ5LSq/tienda-macro-logo.png" },
-  { key: "ciudad", name: "Tienda Ciudad", logo: "https://i.postimg.cc/rm18JP5d/tienda-ciudad-logo.png" },
+  { key: "bna", name: "Tienda BNA", logo: "https://i.ibb.co/4RMk522C/tienda-bna-logo.png" },
+  { key: "macro", name: "Tienda Macro", logo: "https://i.ibb.co/XfPPnFs0/tienda-macro-logo.png" },
+  { key: "ciudad", name: "Tienda Ciudad", logo: "https://i.ibb.co/3yGTwBCk/tienda-ciudad-logo.png" },
 ];
 const STORE_FIELDS = {
   bna: ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU", "BRAND", "ORIGIN_OF_PRODUCT"],
@@ -16,7 +16,7 @@ const CATEGORY_STORE_OPTIONS = [
   { key: "macro", label: "Tienda Macro" },
 ];
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, skuCatalog: null };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, skuCatalog: null, loginCredentials: [] };
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
@@ -32,6 +32,8 @@ function showToast(msg) {
 }
 function switchView(viewId) {
   ["loginView", "storeView", "workspaceView", "categoriesView"].forEach((id) => $(id).classList.toggle("active", id === viewId));
+  const footer = document.querySelector("footer");
+  if (footer) footer.classList.toggle("hidden", viewId === "loginView");
   const footerLinks = $("footerLinksStack");
   if (footerLinks) footerLinks.classList.toggle("hidden", viewId === "loginView");
 }
@@ -607,6 +609,8 @@ async function init() {
     state.user = userFromSession;
     switchView("storeView");
     loadHistory();
+  } else {
+    switchView("loginView");
   }
 }
 
@@ -617,11 +621,9 @@ $("togglePass").onclick = () => {
   $("togglePass").textContent = showing ? "Ocultar" : "Mostrar";
 };
 
-async function doLogin() {
+async function loadLoginCredentials() {
+  if (state.loginCredentials.length) return state.loginCredentials;
   const remote = await dbGet("user");
-  const inputUser = $("loginUser").value.trim();
-  const inputPass = $("loginPass").value.trim();
-
   const credentials = [];
   if (remote?.user && remote?.pass !== undefined) credentials.push({ user: String(remote.user), pass: String(remote.pass) });
   Object.keys(remote || {}).forEach((k) => {
@@ -631,20 +633,58 @@ async function doLogin() {
     const passKey = `pass${idx}`;
     if (remote[passKey] !== undefined) credentials.push({ user: String(remote[k]), pass: String(remote[passKey]) });
   });
-
-  const ok = credentials.find((c) => c.user === inputUser && c.pass === inputPass);
-  if (ok) {
-    state.user = ok.user;
-    localStorage.setItem("ttx_user", state.user);
-    switchView("storeView");
-    loadHistory();
-    showToast("Bienvenido");
-  } else showToast("Credenciales inválidas");
+  state.loginCredentials = credentials;
+  return credentials;
 }
 
-$("loginBtn").onclick = doLogin;
-$("loginPass").addEventListener("keydown", (e) => e.key === "Enter" && doLogin());
-$("loginUser").addEventListener("keydown", (e) => e.key === "Enter" && doLogin());
+function setLoginLoading(show) {
+  const overlay = $("loginLoadingOverlay");
+  if (overlay) overlay.classList.toggle("hidden", !show);
+}
+
+async function completeLogin(user) {
+  state.user = user;
+  localStorage.setItem("ttx_user", state.user);
+  switchView("storeView");
+  loadHistory();
+  showToast("Bienvenido");
+}
+
+async function doLogin({ showSpinner = true } = {}) {
+  const inputUser = $("loginUser").value.trim();
+  const inputPass = $("loginPass").value.trim();
+  const credentials = await loadLoginCredentials();
+  const ok = credentials.find((c) => c.user === inputUser && c.pass === inputPass);
+
+  if (!ok) return showToast("Credenciales inválidas");
+  if (showSpinner) {
+    setLoginLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    setLoginLoading(false);
+  }
+  await completeLogin(ok.user);
+}
+
+let autoLoginTimer = null;
+async function scheduleAutoLoginIfValid() {
+  clearTimeout(autoLoginTimer);
+  if (!$("loginView").classList.contains("active")) return;
+  const user = $("loginUser").value.trim();
+  const pass = $("loginPass").value.trim();
+  if (!user || !pass) return;
+  const credentials = await loadLoginCredentials();
+  const valid = credentials.some((c) => c.user === user && c.pass === pass);
+  if (!valid) return;
+  autoLoginTimer = setTimeout(() => {
+    if ($("loginView").classList.contains("active")) doLogin({ showSpinner: false });
+  }, 2500);
+}
+
+$("loginBtn").onclick = () => doLogin({ showSpinner: true });
+$("loginPass").addEventListener("input", scheduleAutoLoginIfValid);
+$("loginUser").addEventListener("input", scheduleAutoLoginIfValid);
+$("loginPass").addEventListener("keydown", (e) => e.key === "Enter" && doLogin({ showSpinner: true }));
+$("loginUser").addEventListener("keydown", (e) => e.key === "Enter" && doLogin({ showSpinner: true }));
 
 $("menuBtn").onclick = () => $("menuDrawer").classList.toggle("open");
 $("workspaceMenuBtn").onclick = () => $("workspaceDrawer").classList.toggle("open");
