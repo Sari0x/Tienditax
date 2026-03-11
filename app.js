@@ -136,14 +136,34 @@ function getCategoryMatches(term) {
 }
 
 function normalizeSkuValue(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function getSkuMatches(term) {
   const list = state.skuCatalog ? Object.keys(state.skuCatalog) : [];
   const t = normalizeSkuValue(term);
   if (!t) return [];
-  return list.filter((sku) => normalizeSkuValue(sku).includes(t)).slice(0, 8);
+  return list.filter((sku) => {
+    const item = state.skuCatalog[sku] || {};
+    return normalizeSkuValue(sku).includes(t) || normalizeSkuValue(item.Code || "").includes(t);
+  }).slice(0, 8);
+}
+
+
+function findSkuKeyByInput(term) {
+  if (!state.skuCatalog) return "";
+  const normalizedTerm = normalizeSkuValue(term);
+  if (!normalizedTerm) return "";
+  return Object.keys(state.skuCatalog).find((key) => {
+    const item = state.skuCatalog[key] || {};
+    const normalizedKey = normalizeSkuValue(key);
+    const normalizedCode = normalizeSkuValue(item.Code || "");
+    return normalizedKey === normalizedTerm || normalizedCode === normalizedTerm;
+  }) || "";
 }
 
 function convertCmToMm(rawValue) {
@@ -172,18 +192,18 @@ function buildDescriptionFromProperties(properties) {
 function applySkuDataToRow(rowIdx, sku) {
   const row = state.products[state.currentStore]?.[rowIdx];
   if (!row || !state.skuCatalog) return;
-  const selectedSku = Object.keys(state.skuCatalog).find((candidate) => normalizeSkuValue(candidate) === normalizeSkuValue(sku));
+  const selectedSku = findSkuKeyByInput(sku);
   if (!selectedSku) return;
 
   const data = state.skuCatalog[selectedSku] || {};
-  row["Property SKU"] = selectedSku;
+  row["Property SKU"] = data.Code !== undefined && data.Code !== null && String(data.Code).trim() ? String(data.Code).trim() : selectedSku;
   if (data.Brand !== undefined) {
     row.Manufacturer = String(data.Brand);
     if ("BRAND" in row) row.BRAND = String(data.Brand);
   }
   if (data.BoxHeight !== undefined) row.Height = convertCmToMm(data.BoxHeight);
   if (data.BoxLength !== undefined) row.Length = convertCmToMm(data.BoxLength);
-  if (data.BoxWeight !== undefined) row.Weight = convertCmToMm(data.BoxWeight);
+  if (data.BoxWeight !== undefined) row.Weight = String(data.BoxWeight);
   if (data.BoxWidth !== undefined) row.Width = convertCmToMm(data.BoxWidth);
   if (data.Name !== undefined) row.Title = String(data.Name);
 
@@ -279,7 +299,7 @@ function buildWorkspace() {
       if (f === "Category") renderCategorySuggestions(control, r);
       if (f === "Property SKU") {
         renderSkuSuggestions(control, r);
-        const exactSku = getSkuMatches(control.value).find((candidate) => normalizeSkuValue(candidate) === normalizeSkuValue(control.value));
+        const exactSku = findSkuKeyByInput(control.value);
         if (exactSku) {
           applySkuDataToRow(r, exactSku);
           buildWorkspace();
@@ -312,7 +332,7 @@ function buildWorkspace() {
           const host = control.parentElement.querySelector('.suggest-host');
           host.innerHTML = '';
           host.classList.add('hidden');
-          const exactSku = getSkuMatches(control.value).find((candidate) => normalizeSkuValue(candidate) === normalizeSkuValue(control.value));
+          const exactSku = findSkuKeyByInput(control.value);
           if (exactSku) {
             applySkuDataToRow(r, exactSku);
             buildWorkspace();
