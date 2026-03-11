@@ -154,6 +154,7 @@ function convertCmToMm(rawValue) {
 
 function buildDescriptionFromProperties(properties) {
   if (!properties || typeof properties !== "object") return "";
+  const excludedKeys = new Set(["presale", "item_contact_form", "tiempo_espera"]);
   const entries = Object.values(properties)
     .filter((item) => item && typeof item === "object")
     .map((item) => {
@@ -161,7 +162,7 @@ function buildDescriptionFromProperties(properties) {
       const rawValue = String(item.Value || "").trim();
       if (!rawKey || !rawValue) return "";
       const cleanKey = rawKey.replace(/^_extprop_/i, "");
-      if (!cleanKey) return "";
+      if (!cleanKey || excludedKeys.has(cleanKey.toLowerCase())) return "";
       return `${cleanKey}: ${rawValue}`;
     })
     .filter(Boolean);
