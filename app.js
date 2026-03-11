@@ -1,6 +1,6 @@
 const DB_URL = "https://tienditax-default-rtdb.firebaseio.com";
 const stores = [
-  { key: "bna", name: "Tienda BNA", logo: "https://i.ibb.co/4RMk522C/tienda-bna-logo.png" },
+  { key: "bna", name: "Tienda BNA", logo: "https://i.postimg.cc/cCxxCBPq/tienda-bna-logo.png" },
   { key: "macro", name: "Tienda Macro", logo: "https://i.ibb.co/XfPPnFs0/tienda-macro-logo.png" },
   { key: "ciudad", name: "Tienda Ciudad", logo: "https://i.ibb.co/3yGTwBCk/tienda-ciudad-logo.png" },
 ];
