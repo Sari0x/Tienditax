@@ -84,11 +84,22 @@ function addConverterLog(text, loading = false) {
   const logs = $("converterLogs");
   const row = document.createElement("div");
   row.className = "converter-log-item";
-  row.innerHTML = loading
-    ? `<img src="https://i.postimg.cc/fbH7b8Vt/spinner-tienditax.png" alt="Cargando" class="mini-spinner"> <span>${text}</span>`
-    : `<span>${text}</span>`;
+  if (loading) {
+    row.innerHTML = `<img src="https://i.postimg.cc/fbH7b8Vt/spinner-tienditax.png" alt="Cargando" class="mini-spinner"> <span>${text}</span>`;
+  } else {
+    row.innerHTML = `<span>${text}</span>`;
+  }
   logs.appendChild(row);
   logs.scrollTop = logs.scrollHeight;
+  return row;
+}
+
+function completeConverterLog(row, text) {
+  if (!row) return;
+  const spinner = row.querySelector(".mini-spinner");
+  if (spinner) spinner.classList.add("stopped");
+  const textNode = row.querySelector("span");
+  if (textNode) textNode.textContent = text;
 }
 
 function clearConverterLogs() {
@@ -175,15 +186,16 @@ async function startConversion() {
   if (sourceFormat === targetFormat) return showToast("Elegí formatos distintos");
 
   clearConverterLogs();
-  addConverterLog(`Preparando ${files.length} archivo(s) para convertir de ${sourceFormat.toUpperCase()} a ${targetFormat.toUpperCase()}...`, true);
+  const prepLog = addConverterLog(`Preparando ${files.length} archivo(s) para convertir de ${sourceFormat.toUpperCase()} a ${targetFormat.toUpperCase()}...`, true);
 
   const converted = [];
   for (const file of files) {
-    addConverterLog(`Convirtiendo ${file.name}...`, true);
+    const loadingLog = addConverterLog(`Convirtiendo ${file.name}...`, true);
     const output = await buildConvertedFile(file, sourceFormat, targetFormat);
     converted.push(output);
-    addConverterLog(`✅ ${file.name} convertido a ${output.filename}`);
+    completeConverterLog(loadingLog, `✅ ${file.name} convertido a ${output.filename}`);
   }
+  completeConverterLog(prepLog, "✅ Preparación finalizada");
 
   const label = buildConversionLabel();
   const safeLabel = sanitizeFilename(label);
@@ -691,7 +703,10 @@ async function exportCsv() {
 async function loadHistory() {
   const path = state.historyMode === "exports" ? "exports" : "conversions";
   const entries = await dbGet(path) || {};
-  const history = Object.values(entries).filter(Boolean).reverse();
+  const rawHistory = Object.values(entries).filter(Boolean).reverse();
+  const history = state.historyMode === "exports"
+    ? rawHistory.filter((item) => item && item.user && item.createdAt && item.filename && item.csv !== undefined)
+    : rawHistory.filter((item) => item && (item.label || (item.user && item.createdAt)));
   const pageSize = 10;
   const currentPageKey = state.historyMode === "exports" ? "historyPage" : "conversionHistoryPage";
   const totalPages = Math.max(1, Math.ceil(history.length / pageSize));
@@ -727,7 +742,7 @@ async function loadHistory() {
     pageItems.forEach((h) => {
       const row = document.createElement("div");
       row.className = "list-item";
-      row.innerHTML = `<span>${h.user} - ${h.createdAt} - ${h.filename}</span><button class='ios-btn small'>Descargar</button>`;
+      row.innerHTML = `<span>${h.user || "Usuario"} - ${h.createdAt || "sin fecha"} - ${h.filename || "sin nombre"}</span><button class='ios-btn small'>Descargar</button>`;
       row.querySelector("button").onclick = () => {
         const blob = new Blob([h.csv], { type: "text/csv;charset=utf-8;" });
         const a = document.createElement("a");
