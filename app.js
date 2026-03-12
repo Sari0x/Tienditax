@@ -18,12 +18,46 @@ const CATEGORY_STORE_OPTIONS = [
 
 const ADMIN_USER = "manusario";
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null, theme: "light" };
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 const dbPost = async (path, data) => (await fetch(`${DB_URL}/${path}.json`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) })).json();
 const dbGetAbsolute = async (url) => (await fetch(url)).json();
+
+
+function preferenceThemeKey(user) {
+  return `ttx_theme_${user || "guest"}`;
+}
+
+function loadUserThemePreference(user) {
+  const saved = localStorage.getItem(preferenceThemeKey(user));
+  state.theme = saved === "dark" ? "dark" : "light";
+}
+
+function applyUserPreferences() {
+  const darkEnabled = state.theme === "dark";
+  document.body.classList.toggle("dark", darkEnabled);
+  ["themeToggleMenu", "themeToggleWorkspace"].forEach((id) => {
+    if ($(id)) $(id).checked = darkEnabled;
+  });
+}
+
+function persistUserPreferences() {
+  localStorage.setItem(preferenceThemeKey(state.user), state.theme);
+}
+
+function setTheme(theme) {
+  state.theme = theme === "dark" ? "dark" : "light";
+  applyUserPreferences();
+  persistUserPreferences();
+}
+
+function bindPreferenceSwitch(id, onChange) {
+  const el = $(id);
+  if (!el) return;
+  el.onchange = (e) => onChange(e.target.checked);
+}
 
 function showToast(msg) {
   const t = document.createElement("div");
@@ -1111,6 +1145,9 @@ async function init() {
   state.draft = JSON.parse(localStorage.getItem("ttx_draft") || "{}");
   state.skuCatalog = await dbGetAbsolute("https://precios-novogar-default-rtdb.firebaseio.com/ProductosE3porSKU.json") || {};
 
+  loadUserThemePreference();
+  applyUserPreferences();
+
   window.addEventListener("resize", syncTopScrollbar);
 
   renderCategoryList();
@@ -1121,6 +1158,8 @@ async function init() {
   const userFromSession = localStorage.getItem("ttx_user");
   if (userFromSession) {
     state.user = userFromSession;
+    loadUserThemePreference(state.user);
+    applyUserPreferences();
     const rememberedStore = localStorage.getItem(`ttx_store_${state.user}`);
     if (rememberedStore) {
       await selectStore(rememberedStore);
@@ -1165,6 +1204,8 @@ async function completeLogin(user) {
   state.user = user;
   state.activeSessionId = null;
   localStorage.setItem("ttx_user", state.user);
+  loadUserThemePreference(state.user);
+  applyUserPreferences();
   switchView("storeView");
   loadHistory();
   showToast("Bienvenido");
@@ -1205,6 +1246,9 @@ $("loginPass").addEventListener("input", scheduleAutoLoginIfValid);
 $("loginUser").addEventListener("input", scheduleAutoLoginIfValid);
 $("loginPass").addEventListener("keydown", (e) => e.key === "Enter" && doLogin({ showSpinner: true }));
 $("loginUser").addEventListener("keydown", (e) => e.key === "Enter" && doLogin({ showSpinner: true }));
+
+bindPreferenceSwitch("themeToggleMenu", (checked) => setTheme(checked ? "dark" : "light"));
+bindPreferenceSwitch("themeToggleWorkspace", (checked) => setTheme(checked ? "dark" : "light"));
 
 $("menuBtn").onclick = () => $("menuDrawer").classList.toggle("open");
 $("workspaceMenuBtn").onclick = () => $("workspaceDrawer").classList.toggle("open");
