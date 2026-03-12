@@ -204,3 +204,7 @@ footer { min-height: 92px; display: flex; justify-content: space-between; align-
   animation: none;
   opacity: .85;
 }
+
+body{
+  zoom: 0.9;
+}
