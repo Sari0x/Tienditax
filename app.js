@@ -970,10 +970,21 @@ async function loadHistory() {
   pageItems.forEach((session) => {
     const row = document.createElement("div");
     row.className = "list-item";
-    row.innerHTML = `<span>${session.usuario} - ${session.fechaCreacion || "sin fecha"} - ${session.estado || ""}</span><button class='ios-btn small'>Abrir sesión</button>`;
-    row.querySelector("button").onclick = async () => {
+    row.innerHTML = `<span>${session.usuario} - ${session.fechaCreacion || "sin fecha"} - ${session.estado || ""}</span><div class='inline-actions'><button class='ios-btn small' data-act='open'>Abrir sesión</button><button class='icon-action danger' data-act='delete' title='Eliminar sesión'><i class='bi bi-trash3'></i></button></div>`;
+    row.querySelector("[data-act='open']").onclick = async () => {
       await loadSessionById(session.id);
       $("historyModal").classList.add("hidden");
+    };
+    row.querySelector("[data-act='delete']").onclick = async () => {
+      const ok = await confirmAction("Eliminar sesión", "¿Estás seguro de eliminar esta sesión?");
+      if (!ok) return;
+      await dbPut(`sessions/${session.id}`, null);
+      if (state.activeSessionId === session.id) {
+        state.activeSessionId = null;
+        localStorage.removeItem(`ttx_active_session_${state.user}_${state.currentStore}`);
+      }
+      showToast("Sesión eliminada");
+      loadHistory();
     };
     box.appendChild(row);
   });
