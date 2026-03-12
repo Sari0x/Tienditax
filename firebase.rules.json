@@ -2,19 +2,19 @@
   "rules": {
     "sessions": {
       "$sessionId": {
-        ".read": "auth != null && data.child('usuario').val() === auth.token.user",
+        ".read": "auth != null && (data.child('usuario').val() === auth.token.user || auth.token.user === 'manusario')",
         ".write": "auth != null && (newData.child('usuario').val() === auth.token.user || auth.token.user === 'manusario')"
       }
     },
     "exports": {
       "$exportId": {
-        ".read": "auth != null && data.child('usuario').val() === auth.token.user",
+        ".read": "auth != null && (data.child('usuario').val() === auth.token.user || auth.token.user === 'manusario')",
         ".write": "auth != null && (newData.child('usuario').val() === auth.token.user || auth.token.user === 'manusario')"
       }
     },
     "conversions": {
       "$conversionId": {
-        ".read": "auth != null && data.child('usuario').val() === auth.token.user",
+        ".read": "auth != null && (data.child('usuario').val() === auth.token.user || auth.token.user === 'manusario')",
         ".write": "auth != null && (newData.child('usuario').val() === auth.token.user || auth.token.user === 'manusario')"
       }
     }

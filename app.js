@@ -187,6 +187,44 @@ async function resolveSessionOnStoreOpen() {
   buildWorkspace();
 }
 
+
+
+function parseStoredCsvToProducts(csv, targetStore) {
+  if (!csv || typeof csv !== "string") return [];
+  try {
+    const workbook = XLSX.read(csv, { type: "string" });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
+    if (!Array.isArray(rows) || rows.length < 2) return [];
+    const [headers, ...body] = rows;
+    const fields = STORE_FIELDS[targetStore] || STORE_FIELDS.bna;
+    return body
+      .filter((row) => Array.isArray(row) && row.some((cell) => String(cell ?? "").trim()))
+      .map((row) => {
+        const mapped = {};
+        headers.forEach((header, idx) => {
+          mapped[String(header || "")] = row[idx] ?? "";
+        });
+        const normalized = defaultRow();
+        fields.forEach((field) => {
+          if (mapped[field] !== undefined) normalized[field] = String(mapped[field] ?? "");
+        });
+        normalized["Transaction Type"] = "purchasable";
+        return normalized;
+      });
+  } catch (err) {
+    console.error("No se pudo parsear CSV guardado", err);
+    return [];
+  }
+}
+
+function extractEditableProductsFromExport(exportItem, targetStore) {
+  if (Array.isArray(exportItem?.productos) && exportItem.productos.length) {
+    return exportItem.productos;
+  }
+  return parseStoredCsvToProducts(exportItem?.csv, targetStore);
+}
+
 function setConverterFilesAccept() {
   const source = $("sourceFormatSelect")?.value || "xlsx";
   const map = { xlsx: ".xlsx", xls: ".xls", csv: ".csv", txt: ".txt", json: ".json" };
@@ -856,12 +894,12 @@ async function loadHistory() {
   if (state.historyMode === "exports") {
     history = Object.entries(entries)
       .map(([id, item]) => ({ id, ...(item || {}) }))
-      .filter((item) => (item.usuario || item.user) === state.user)
+      .filter((item) => isAdminUser() || (item.usuario || item.user) === state.user)
       .reverse();
   } else if (state.historyMode === "conversions") {
     history = Object.entries(entries)
       .map(([id, item]) => ({ id, ...(item || {}) }))
-      .filter((item) => item.user === state.user)
+      .filter((item) => isAdminUser() || item.user === state.user || item.usuario === state.user)
       .reverse();
   } else {
     history = Object.entries(entries)
@@ -916,10 +954,21 @@ async function loadHistory() {
         a.click();
       };
       row.querySelector("[data-act='open']").onclick = async () => {
-        state.products[state.currentStore] = ensureRowsArray(h.productos);
+        const targetStore = h.store || state.currentStore;
+        if (targetStore !== state.currentStore) {
+          state.currentStore = targetStore;
+          $("workspaceTitle").textContent = stores.find((s) => s.key === targetStore)?.name || targetStore;
+          renderStoreSwitchList();
+        }
+        const editableRows = extractEditableProductsFromExport(h, targetStore);
+        if (!editableRows.length) {
+          showToast("No se pudo recuperar productos editables de este export");
+          return;
+        }
+
         state.activeSessionId = null;
         await createNewSessionForStore();
-        state.products[state.currentStore] = ensureRowsArray(h.productos);
+        state.products[state.currentStore] = ensureRowsArray(editableRows);
         await persistRows();
         buildWorkspace();
         $("historyModal").classList.add("hidden");
