@@ -16,7 +16,7 @@ const CATEGORY_STORE_OPTIONS = [
   { key: "macro", label: "Tienda Macro" },
 ];
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, skuCatalog: null, loginCredentials: [] };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [] };
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
@@ -45,6 +45,201 @@ function categoryBucket(storeKey) {
 }
 function storeFields() {
   return STORE_FIELDS[state.currentStore] || STORE_FIELDS.bna;
+}
+
+
+function conversionTimestamp() {
+  return new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).replace(",", "");
+}
+
+function buildConversionLabel() {
+  return `${state.user} - ${conversionTimestamp()} - conversion`;
+}
+
+function sanitizeFilename(value) {
+  return String(value || "").replace(/[\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim();
+}
+
+function updateHistoryTabs() {
+  const exportsTab = $("historyExportsTab");
+  const conversionsTab = $("historyConversionsTab");
+  if (!exportsTab || !conversionsTab) return;
+  const isExports = state.historyMode === "exports";
+  exportsTab.classList.toggle("active", isExports);
+  conversionsTab.classList.toggle("active", !isExports);
+}
+
+function setConverterFilesAccept() {
+  const source = $("sourceFormatSelect")?.value || "xlsx";
+  const map = { xlsx: ".xlsx", xls: ".xls", csv: ".csv", txt: ".txt", json: ".json" };
+  if ($("converterFilesInput")) $("converterFilesInput").accept = map[source] || "";
+}
+
+function setConverterFilesInfo() {
+  const files = $("converterFilesInput")?.files || [];
+  $("converterFilesInfo").textContent = files.length ? `${files.length} archivo(s) seleccionado(s)` : "Sin archivos seleccionados";
+}
+
+function addConverterLog(text, loading = false) {
+  const logs = $("converterLogs");
+  const row = document.createElement("div");
+  row.className = "converter-log-item";
+  if (loading) {
+    row.innerHTML = `<img src="https://i.postimg.cc/fbH7b8Vt/spinner-tienditax.png" alt="Cargando" class="mini-spinner"> <span>${text}</span>`;
+  } else {
+    row.innerHTML = `<span>${text}</span>`;
+  }
+  logs.appendChild(row);
+  logs.scrollTop = logs.scrollHeight;
+  return row;
+}
+
+function completeConverterLog(row, text) {
+  if (!row) return;
+  const spinner = row.querySelector(".mini-spinner");
+  if (spinner) spinner.classList.add("stopped");
+  const textNode = row.querySelector("span");
+  if (textNode) textNode.textContent = text;
+}
+
+function clearConverterLogs() {
+  $("converterLogs").innerHTML = "";
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  bytes.forEach((b) => binary += String.fromCharCode(b));
+  return btoa(binary);
+}
+
+function base64ToBlob(base64, mimeType) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType });
+}
+
+function textToRows(text) {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length);
+  return lines.map((line) => line.split(",").map((cell) => cell.trim()));
+}
+
+function rowsToCsv(rows) {
+  return rows.map((r) => r.map((cell) => `"${String(cell ?? "").replaceAll('"', '""')}"`).join(",")).join("\n");
+}
+
+function rowsToObjects(rows) {
+  if (!rows.length) return [];
+  const [headers, ...body] = rows;
+  return body.map((row) => Object.fromEntries(headers.map((h, idx) => [String(h || `col_${idx + 1}`), row[idx] ?? ""])));
+}
+
+async function parseInputFile(file, sourceFormat) {
+  if (sourceFormat === "xlsx" || sourceFormat === "xls") {
+    const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
+  }
+  if (sourceFormat === "json") {
+    const parsed = JSON.parse(await file.text());
+    if (!Array.isArray(parsed)) throw new Error("JSON inválido");
+    if (!parsed.length) return [[]];
+    if (Array.isArray(parsed[0])) return parsed;
+    const headers = Object.keys(parsed[0] || {});
+    const body = parsed.map((item) => headers.map((h) => item[h] ?? ""));
+    return [headers, ...body];
+  }
+  const text = await file.text();
+  return textToRows(text);
+}
+
+async function buildConvertedFile(file, sourceFormat, targetFormat) {
+  const rows = await parseInputFile(file, sourceFormat);
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "archivo";
+
+  if (targetFormat === "csv") {
+    const csv = rowsToCsv(rows);
+    return { filename: `${baseName}.csv`, mime: "text/csv;charset=utf-8;", blob: new Blob([csv], { type: "text/csv;charset=utf-8;" }) };
+  }
+  if (targetFormat === "txt") {
+    const txt = rows.map((r) => r.join("\t")).join("\n");
+    return { filename: `${baseName}.txt`, mime: "text/plain;charset=utf-8;", blob: new Blob([txt], { type: "text/plain;charset=utf-8;" }) };
+  }
+  if (targetFormat === "json") {
+    const json = JSON.stringify(rowsToObjects(rows), null, 2);
+    return { filename: `${baseName}.json`, mime: "application/json;charset=utf-8;", blob: new Blob([json], { type: "application/json;charset=utf-8;" }) };
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Datos");
+  const array = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  return { filename: `${baseName}.xlsx`, mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", blob: new Blob([array], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }) };
+}
+
+async function startConversion() {
+  const files = Array.from($("converterFilesInput").files || []);
+  const sourceFormat = $("sourceFormatSelect").value;
+  const targetFormat = $("targetFormatSelect").value;
+
+  if (!files.length) return showToast("Seleccioná al menos un archivo");
+  if (sourceFormat === targetFormat) return showToast("Elegí formatos distintos");
+
+  clearConverterLogs();
+  const prepLog = addConverterLog(`Preparando ${files.length} archivo(s) para convertir de ${sourceFormat.toUpperCase()} a ${targetFormat.toUpperCase()}...`, true);
+
+  const waitLog = addConverterLog("⏳ Procesando conversión (aprox. 3 segundos)...", true);
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
+  const converted = [];
+  for (const file of files) {
+    const loadingLog = addConverterLog(`Convirtiendo ${file.name}...`, true);
+    const output = await buildConvertedFile(file, sourceFormat, targetFormat);
+    converted.push(output);
+    completeConverterLog(loadingLog, `✅ ${file.name} convertido a ${output.filename}`);
+  }
+  completeConverterLog(prepLog, "✅ Preparación finalizada");
+  completeConverterLog(waitLog, "✅ Tiempo de procesamiento completado");
+
+  const label = buildConversionLabel();
+  const safeLabel = sanitizeFilename(label);
+
+  let payload = null;
+  if (converted.length === 1) {
+    const only = converted[0];
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(only.blob);
+    link.download = only.filename;
+    link.click();
+    payload = { type: "single", filename: only.filename, mime: only.mime, contentBase64: arrayBufferToBase64(await only.blob.arrayBuffer()) };
+    addConverterLog(`Archivo exportado: ${only.filename}`);
+  } else {
+    const zip = new JSZip();
+    for (const file of converted) zip.file(file.filename, await file.blob.arrayBuffer());
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const zipFilename = `${safeLabel}.zip`;
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(zipBlob);
+    link.download = zipFilename;
+    link.click();
+    payload = { type: "zip", filename: zipFilename, mime: "application/zip", contentBase64: arrayBufferToBase64(await zipBlob.arrayBuffer()) };
+    addConverterLog(`ZIP exportado: ${zipFilename}`);
+  }
+
+  await dbPost("conversions", {
+    user: state.user,
+    createdAt: nowArgentina(),
+    label,
+    sourceFormat,
+    targetFormat,
+    totalFiles: files.length,
+    payload,
+  });
+
+  addConverterLog("Conversión finalizada con éxito ✨");
+  showToast("Conversión finalizada");
+  state.conversionHistoryPage = 1;
+  if (state.historyMode === "conversions") loadHistory();
 }
 
 function renderStoreButtons() {
@@ -510,11 +705,16 @@ async function exportCsv() {
 }
 
 async function loadHistory() {
-  const entries = await dbGet("exports") || {};
-  const history = Object.values(entries).filter(Boolean).reverse();
+  const path = state.historyMode === "exports" ? "exports" : "conversions";
+  const entries = await dbGet(path) || {};
+  const rawHistory = Object.values(entries).filter(Boolean).reverse();
+  const history = state.historyMode === "exports"
+    ? rawHistory.filter((item) => item && item.user && item.createdAt && item.filename && item.csv !== undefined)
+    : rawHistory.filter((item) => item && (item.label || (item.user && item.createdAt)));
   const pageSize = 10;
+  const currentPageKey = state.historyMode === "exports" ? "historyPage" : "conversionHistoryPage";
   const totalPages = Math.max(1, Math.ceil(history.length / pageSize));
-  state.historyPage = Math.min(Math.max(state.historyPage, 1), totalPages);
+  state[currentPageKey] = Math.min(Math.max(state[currentPageKey], 1), totalPages);
 
   const pagination = $("historyPagination");
   pagination.innerHTML = "";
@@ -522,35 +722,54 @@ async function loadHistory() {
     for (let page = 1; page <= totalPages; page += 1) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `ios-btn small page-btn ${page === state.historyPage ? "active" : ""}`;
+      btn.className = `ios-btn small page-btn ${page === state[currentPageKey] ? "active" : ""}`;
       btn.textContent = page;
       btn.onclick = () => {
-        state.historyPage = page;
+        state[currentPageKey] = page;
         loadHistory();
       };
       pagination.appendChild(btn);
     }
   }
 
-  const start = (state.historyPage - 1) * pageSize;
+  const start = (state[currentPageKey] - 1) * pageSize;
   const pageItems = history.slice(start, start + pageSize);
 
   const box = $("historyList");
   box.innerHTML = "";
   if (!pageItems.length) {
-    box.innerHTML = "<p>Sin exportaciones registradas</p>";
+    box.innerHTML = state.historyMode === "exports" ? "<p>Sin exportaciones registradas</p>" : "<p>Sin conversiones registradas</p>";
+    return;
+  }
+
+  if (state.historyMode === "exports") {
+    pageItems.forEach((h) => {
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `<span>${h.user || "Usuario"} - ${h.createdAt || "sin fecha"} - ${h.filename || "sin nombre"}</span><button class='ios-btn small'>Descargar</button>`;
+      row.querySelector("button").onclick = () => {
+        const blob = new Blob([h.csv], { type: "text/csv;charset=utf-8;" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = h.filename;
+        a.click();
+      };
+      box.appendChild(row);
+    });
     return;
   }
 
   pageItems.forEach((h) => {
     const row = document.createElement("div");
     row.className = "list-item";
-    row.innerHTML = `<span>${h.user} - ${h.createdAt} - ${h.filename}</span><button class='ios-btn small'>Descargar</button>`;
+    const outputName = h.payload?.filename || "archivo";
+    row.innerHTML = `<span>${h.label || `${h.user} - ${h.createdAt} - conversion`} (${h.sourceFormat || "?"} → ${h.targetFormat || "?"}) - ${outputName}</span><button class='ios-btn small'>Descargar</button>`;
     row.querySelector("button").onclick = () => {
-      const blob = new Blob([h.csv], { type: "text/csv;charset=utf-8;" });
+      if (!h.payload?.contentBase64 || !h.payload?.mime) return showToast("No hay archivo guardado");
+      const blob = base64ToBlob(h.payload.contentBase64, h.payload.mime);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = h.filename;
+      a.download = h.payload.filename || "conversion";
       a.click();
     };
     box.appendChild(row);
@@ -603,6 +822,9 @@ async function init() {
   window.addEventListener("resize", syncTopScrollbar);
 
   renderCategoryList();
+  setConverterFilesAccept();
+  setConverterFilesInfo();
+  updateHistoryTabs();
 
   const userFromSession = localStorage.getItem("ttx_user");
   if (userFromSession) {
@@ -691,12 +913,17 @@ $("workspaceMenuBtn").onclick = () => $("workspaceDrawer").classList.toggle("ope
 $("closeMenuBtn").onclick = closeAllDrawers;
 $("closeWorkspaceMenuBtn").onclick = closeAllDrawers;
 
-$("menuHistorialBtn").onclick = () => { closeAllDrawers(); state.historyPage = 1; $("historyModal").classList.remove("hidden"); loadHistory(); };
-$("workspaceHistorialBtn").onclick = () => { closeAllDrawers(); state.historyPage = 1; $("historyModal").classList.remove("hidden"); loadHistory(); };
+$("menuHistorialBtn").onclick = () => { closeAllDrawers(); state.historyMode = "exports"; state.historyPage = 1; updateHistoryTabs(); $("historyModal").classList.remove("hidden"); loadHistory(); };
+$("workspaceHistorialBtn").onclick = () => { closeAllDrawers(); state.historyMode = "exports"; state.historyPage = 1; updateHistoryTabs(); $("historyModal").classList.remove("hidden"); loadHistory(); };
 $("closeHistoryModal").onclick = () => $("historyModal").classList.add("hidden");
+$("historyExportsTab").onclick = () => { state.historyMode = "exports"; state.historyPage = 1; updateHistoryTabs(); loadHistory(); };
+$("historyConversionsTab").onclick = () => { state.historyMode = "conversions"; state.conversionHistoryPage = 1; updateHistoryTabs(); loadHistory(); };
 
 $("menuCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("categoriesView"); renderCategoryList(); };
 $("workspaceCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("categoriesView"); renderCategoryList(); };
+$("menuConverterBtn").onclick = () => { closeAllDrawers(); $("converterModal").classList.remove("hidden"); };
+$("workspaceConverterBtn").onclick = () => { closeAllDrawers(); $("converterModal").classList.remove("hidden"); };
+$("closeConverterModal").onclick = () => $("converterModal").classList.add("hidden");
 $("categoriesBackBtn").onclick = () => switchView(state.currentStore ? "workspaceView" : "storeView");
 
 $("changeStoreBtn").onclick = () => { renderStoreSwitchList(); $("storeSwitchModal").classList.remove("hidden"); };
@@ -705,6 +932,17 @@ $("closeStoreSwitchModal").onclick = () => $("storeSwitchModal").classList.add("
 $("categoryStoreSelect").onchange = renderCategoryList;
 $("addCategoryBtn").onclick = () => addCategory($("categoryStoreSelect").value, $("catName").value.trim(), $("catId").value.trim());
 $("xlsxInput").onchange = (e) => e.target.files?.[0] && importXlsx(e.target.files[0], $("categoryStoreSelect").value);
+$("sourceFormatSelect").onchange = setConverterFilesAccept;
+$("converterFilesInput").onchange = setConverterFilesInfo;
+$("startConversionBtn").onclick = async () => {
+  try {
+    await startConversion();
+  } catch (err) {
+    console.error(err);
+    addConverterLog("❌ Error durante la conversión");
+    showToast("No se pudo convertir el/los archivo(s)");
+  }
+};
 
 $("confirmDeleteBtn").onclick = async () => {
   if (state.pendingDelete) await state.pendingDelete();
