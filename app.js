@@ -16,7 +16,9 @@ const CATEGORY_STORE_OPTIONS = [
   { key: "macro", label: "Tienda Macro" },
 ];
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [] };
+const ADMIN_USER = "manusario";
+
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null };
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
@@ -60,13 +62,129 @@ function sanitizeFilename(value) {
   return String(value || "").replace(/[\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim();
 }
 
+function isAdminUser() {
+  return state.user === ADMIN_USER;
+}
+
 function updateHistoryTabs() {
   const exportsTab = $("historyExportsTab");
   const conversionsTab = $("historyConversionsTab");
-  if (!exportsTab || !conversionsTab) return;
-  const isExports = state.historyMode === "exports";
-  exportsTab.classList.toggle("active", isExports);
-  conversionsTab.classList.toggle("active", !isExports);
+  const sessionsTab = $("historySessionsTab");
+  if (!exportsTab || !conversionsTab || !sessionsTab) return;
+  exportsTab.classList.toggle("active", state.historyMode === "exports");
+  conversionsTab.classList.toggle("active", state.historyMode === "conversions");
+  sessionsTab.classList.toggle("active", state.historyMode === "sessions");
+}
+
+
+
+
+
+async function confirmAction(title, text) {
+  if (window.Swal?.fire) {
+    const res = await Swal.fire({ title, text, icon: "warning", showCancelButton: true, confirmButtonText: "Confirmar", cancelButtonText: "Cancelar" });
+    return res.isConfirmed;
+  }
+  return window.confirm(`${title}\n${text}`);
+}
+
+async function askSessionAction() {
+  if (window.Swal?.fire) {
+    const res = await Swal.fire({
+      title: "Sesión de carga",
+      text: "Elegí cómo querés continuar",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Continuar hoja actual",
+      cancelButtonText: "Nueva hoja de carga",
+      reverseButtons: true,
+      allowOutsideClick: false,
+    });
+    return res.isConfirmed ? "continue" : "new";
+  }
+  return window.confirm("Aceptar: continuar hoja actual. Cancelar: crear nueva hoja") ? "continue" : "new";
+}
+
+async function getUserSessions(status = null) {
+  const entries = await dbGet("sessions") || {};
+  const list = Object.entries(entries).map(([id, value]) => ({ id, ...(value || {}) }))
+    .filter((item) => item.usuario === state.user);
+  const filtered = status ? list.filter((item) => item.estado === status) : list;
+  return filtered.sort((a, b) => String(b.fechaCreacion || "").localeCompare(String(a.fechaCreacion || "")));
+}
+
+async function getActiveSessionForCurrentStore() {
+  const sessions = await getUserSessions("activa");
+  return sessions.find((session) => session.store === state.currentStore) || null;
+}
+
+function ensureRowsArray(rows) {
+  return Array.isArray(rows) && rows.length ? rows : [defaultRow()];
+}
+
+async function createNewSessionForStore() {
+  const payload = {
+    sessionId: "",
+    usuario: state.user,
+    fechaCreacion: nowArgentina(),
+    estado: "activa",
+    store: state.currentStore,
+    productos: [],
+  };
+  const created = await dbPost("sessions", payload);
+  const sessionId = created?.name;
+  if (!sessionId) throw new Error("No se pudo crear la sesión");
+  payload.sessionId = sessionId;
+  await dbPut(`sessions/${sessionId}`, payload);
+  state.activeSessionId = sessionId;
+  state.products[state.currentStore] = [defaultRow()];
+  state.draft[state.currentStore] = state.products[state.currentStore];
+  localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
+  localStorage.setItem(`ttx_active_session_${state.user}_${state.currentStore}`, sessionId);
+  await persistRows();
+  showToast("Sesión creada");
+}
+
+async function loadSessionById(sessionId, feedback = true) {
+  const session = await dbGet(`sessions/${sessionId}`);
+  if (!session || session.usuario !== state.user) return showToast("No tenés permisos para esta sesión");
+  state.activeSessionId = sessionId;
+  const targetStore = session.store || state.currentStore;
+  if (targetStore && targetStore !== state.currentStore) {
+    state.currentStore = targetStore;
+    $("workspaceTitle").textContent = stores.find((s) => s.key === targetStore)?.name || targetStore;
+    renderStoreSwitchList();
+  }
+  state.products[state.currentStore] = ensureRowsArray(session.productos);
+  state.draft[state.currentStore] = state.products[state.currentStore];
+  localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
+  localStorage.setItem(`ttx_active_session_${state.user}_${state.currentStore}`, sessionId);
+  buildWorkspace();
+  if (feedback) showToast("Sesión cargada");
+}
+
+async function resolveSessionOnStoreOpen() {
+  const remembered = localStorage.getItem(`ttx_active_session_${state.user}_${state.currentStore}`);
+  if (remembered) {
+    const stored = await dbGet(`sessions/${remembered}`);
+    if (stored && stored.usuario === state.user && stored.estado === "activa" && (stored.store || state.currentStore) === state.currentStore) {
+      await loadSessionById(remembered, false);
+      showToast("Sesión restaurada");
+      return;
+    }
+  }
+
+  const action = await askSessionAction();
+  if (action === "continue") {
+    const active = await getActiveSessionForCurrentStore();
+    if (active) {
+      await loadSessionById(active.id);
+      return;
+    }
+    showToast("No hay sesión activa. Se creará una nueva.");
+  }
+  await createNewSessionForStore();
+  buildWorkspace();
 }
 
 function setConverterFilesAccept() {
@@ -228,7 +346,10 @@ async function startConversion() {
 
   await dbPost("conversions", {
     user: state.user,
+    usuario: state.user,
     createdAt: nowArgentina(),
+    fecha: nowArgentina(),
+    archivoURL: null,
     label,
     sourceFormat,
     targetFormat,
@@ -435,6 +556,7 @@ function renderCategorySuggestions(inputEl, rowIdx) {
       inputEl.value = catId;
       host.innerHTML = "";
       host.classList.add("hidden");
+      persistRows();
       validateRows();
     };
   });
@@ -555,7 +677,7 @@ function buildWorkspace() {
       }
       state.draft[state.currentStore] = state.products[state.currentStore];
       localStorage.setItem("ttx_draft", JSON.stringify(state.draft));
-      dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
+      persistRows();
       validateRows();
     };
 
@@ -665,20 +787,21 @@ function checkDuplicateSku(rows) {
 }
 
 async function persistRows() {
+  state.draft[state.currentStore] = state.products[state.currentStore];
   await dbPut(`drafts/${state.user}/${state.currentStore}`, state.products[state.currentStore]);
-  await dbPut(`products/${state.currentStore}`, state.products[state.currentStore]);
+  if (state.activeSessionId) {
+    await dbPut(`sessions/${state.activeSessionId}/productos`, state.products[state.currentStore]);
+  }
 }
 
 async function selectStore(key) {
   state.currentStore = key;
+  state.activeSessionId = null;
+  localStorage.setItem(`ttx_store_${state.user}`, key);
   $("workspaceTitle").textContent = stores.find((s) => s.key === key)?.name || key;
-  const remoteProducts = await dbGet(`products/${key}`);
-  const remoteDraft = await dbGet(`drafts/${state.user}/${key}`);
-  state.products[key] = Array.isArray(remoteProducts) ? remoteProducts : (Array.isArray(remoteDraft) ? remoteDraft : [defaultRow()]);
-  state.draft[key] = state.products[key];
   switchView("workspaceView");
   renderStoreSwitchList();
-  buildWorkspace();
+  await resolveSessionOnStoreOpen();
 }
 
 async function exportCsv() {
@@ -698,21 +821,57 @@ async function exportCsv() {
   a.download = filename;
   a.click();
 
-  await dbPost("exports", { user: state.user, createdAt: nowArgentina(), store: state.currentStore, filename, csv });
-  showToast("Export generado");
+  await dbPost("exports", {
+    sessionId: state.activeSessionId || null,
+    usuario: state.user,
+    fechaExport: nowArgentina(),
+    archivoURL: null,
+    filename,
+    csv,
+    store: state.currentStore,
+    productos: rows,
+  });
+
+  if (state.activeSessionId) {
+    await dbPut(`sessions/${state.activeSessionId}/estado`, "finalizada");
+    localStorage.removeItem(`ttx_active_session_${state.user}_${state.currentStore}`);
+  }
+
+  state.activeSessionId = null;
+  state.products[state.currentStore] = [defaultRow()];
+  await persistRows();
+  buildWorkspace();
+
+  showToast("Export realizado");
+  showToast("Sesión finalizada");
   state.historyPage = 1;
-  loadHistory();
+  if (state.historyMode === "exports") loadHistory();
 }
 
 async function loadHistory() {
-  const path = state.historyMode === "exports" ? "exports" : "conversions";
+  const path = state.historyMode === "exports" ? "exports" : (state.historyMode === "conversions" ? "conversions" : "sessions");
   const entries = await dbGet(path) || {};
-  const rawHistory = Object.values(entries).filter(Boolean).reverse();
-  const history = state.historyMode === "exports"
-    ? rawHistory.filter((item) => item && item.user && item.createdAt && item.filename && item.csv !== undefined)
-    : rawHistory.filter((item) => item && (item.label || (item.user && item.createdAt)));
+  let history = [];
+
+  if (state.historyMode === "exports") {
+    history = Object.entries(entries)
+      .map(([id, item]) => ({ id, ...(item || {}) }))
+      .filter((item) => (item.usuario || item.user) === state.user)
+      .reverse();
+  } else if (state.historyMode === "conversions") {
+    history = Object.entries(entries)
+      .map(([id, item]) => ({ id, ...(item || {}) }))
+      .filter((item) => item.user === state.user)
+      .reverse();
+  } else {
+    history = Object.entries(entries)
+      .map(([id, item]) => ({ id, ...(item || {}) }))
+      .filter((item) => item.usuario === state.user && item.estado === "activa")
+      .sort((a, b) => String(b.fechaCreacion || "").localeCompare(String(a.fechaCreacion || "")));
+  }
+
   const pageSize = 10;
-  const currentPageKey = state.historyMode === "exports" ? "historyPage" : "conversionHistoryPage";
+  const currentPageKey = state.historyMode === "exports" ? "historyPage" : (state.historyMode === "conversions" ? "conversionHistoryPage" : "sessionsPage");
   const totalPages = Math.max(1, Math.ceil(history.length / pageSize));
   state[currentPageKey] = Math.min(Math.max(state[currentPageKey], 1), totalPages);
 
@@ -738,7 +897,9 @@ async function loadHistory() {
   const box = $("historyList");
   box.innerHTML = "";
   if (!pageItems.length) {
-    box.innerHTML = state.historyMode === "exports" ? "<p>Sin exportaciones registradas</p>" : "<p>Sin conversiones registradas</p>";
+    box.innerHTML = state.historyMode === "exports"
+      ? "<p>Sin exportaciones registradas</p>"
+      : (state.historyMode === "conversions" ? "<p>Sin conversiones registradas</p>" : "<p>Sin sesiones activas</p>");
     return;
   }
 
@@ -746,31 +907,84 @@ async function loadHistory() {
     pageItems.forEach((h) => {
       const row = document.createElement("div");
       row.className = "list-item";
-      row.innerHTML = `<span>${h.user || "Usuario"} - ${h.createdAt || "sin fecha"} - ${h.filename || "sin nombre"}</span><button class='ios-btn small'>Descargar</button>`;
-      row.querySelector("button").onclick = () => {
-        const blob = new Blob([h.csv], { type: "text/csv;charset=utf-8;" });
+      row.innerHTML = `<span>${h.usuario || h.user || "Usuario"} - ${h.fechaExport || h.createdAt || "sin fecha"} - ${h.filename || "sin nombre"}</span><div class='inline-actions'><button class='ios-btn small' data-act='download'>Descargar</button><button class='ios-btn small' data-act='open'>Abrir</button>${isAdminUser() ? "<button class='ios-btn danger small' data-act='delete'>Eliminar</button>" : ""}</div>`;
+      row.querySelector("[data-act='download']").onclick = () => {
+        const blob = new Blob([h.csv || ""], { type: "text/csv;charset=utf-8;" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = h.filename;
+        a.download = h.filename || "export.csv";
         a.click();
       };
+      row.querySelector("[data-act='open']").onclick = async () => {
+        state.products[state.currentStore] = ensureRowsArray(h.productos);
+        state.activeSessionId = null;
+        await createNewSessionForStore();
+        state.products[state.currentStore] = ensureRowsArray(h.productos);
+        await persistRows();
+        buildWorkspace();
+        $("historyModal").classList.add("hidden");
+        showToast("Export cargado para edición");
+      };
+      if (isAdminUser()) {
+        row.querySelector("[data-act='delete']").onclick = async () => {
+          const ok = await confirmAction("Eliminar export", "Se eliminará el registro y su archivo asociado.");
+          if (!ok) return;
+          await dbPut(`exports/${h.id}`, null);
+          showToast("Registro eliminado");
+          loadHistory();
+        };
+      }
       box.appendChild(row);
     });
     return;
   }
 
-  pageItems.forEach((h) => {
+  if (state.historyMode === "conversions") {
+    pageItems.forEach((h) => {
+      const row = document.createElement("div");
+      row.className = "list-item";
+      const outputName = h.payload?.filename || "archivo";
+      row.innerHTML = `<span>${h.label || `${h.user} - ${h.createdAt} - conversion`} (${h.sourceFormat || "?"} → ${h.targetFormat || "?"}) - ${outputName}</span><div class='inline-actions'><button class='ios-btn small' data-act='download'>Descargar</button>${isAdminUser() ? "<button class='ios-btn danger small' data-act='delete'>Eliminar</button>" : ""}</div>`;
+      row.querySelector("[data-act='download']").onclick = () => {
+        if (!h.payload?.contentBase64 || !h.payload?.mime) return showToast("No hay archivo guardado");
+        const blob = base64ToBlob(h.payload.contentBase64, h.payload.mime);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = h.payload.filename || "conversion";
+        a.click();
+      };
+      if (isAdminUser()) {
+        row.querySelector("[data-act='delete']").onclick = async () => {
+          const ok = await confirmAction("Eliminar conversión", "Se eliminará el registro y su archivo asociado.");
+          if (!ok) return;
+          await dbPut(`conversions/${h.id}`, null);
+          showToast("Conversión eliminada");
+          loadHistory();
+        };
+      }
+      box.appendChild(row);
+    });
+    return;
+  }
+
+  pageItems.forEach((session) => {
     const row = document.createElement("div");
     row.className = "list-item";
-    const outputName = h.payload?.filename || "archivo";
-    row.innerHTML = `<span>${h.label || `${h.user} - ${h.createdAt} - conversion`} (${h.sourceFormat || "?"} → ${h.targetFormat || "?"}) - ${outputName}</span><button class='ios-btn small'>Descargar</button>`;
-    row.querySelector("button").onclick = () => {
-      if (!h.payload?.contentBase64 || !h.payload?.mime) return showToast("No hay archivo guardado");
-      const blob = base64ToBlob(h.payload.contentBase64, h.payload.mime);
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = h.payload.filename || "conversion";
-      a.click();
+    row.innerHTML = `<span>${session.usuario} - ${session.fechaCreacion || "sin fecha"} - ${session.estado || ""}</span><div class='inline-actions'><button class='ios-btn small' data-act='open'>Abrir sesión</button><button class='icon-action danger' data-act='delete' title='Eliminar sesión'><i class='bi bi-trash3'></i></button></div>`;
+    row.querySelector("[data-act='open']").onclick = async () => {
+      await loadSessionById(session.id);
+      $("historyModal").classList.add("hidden");
+    };
+    row.querySelector("[data-act='delete']").onclick = async () => {
+      const ok = await confirmAction("Eliminar sesión", "¿Estás seguro de eliminar esta sesión?");
+      if (!ok) return;
+      await dbPut(`sessions/${session.id}`, null);
+      if (state.activeSessionId === session.id) {
+        state.activeSessionId = null;
+        localStorage.removeItem(`ttx_active_session_${state.user}_${state.currentStore}`);
+      }
+      showToast("Sesión eliminada");
+      loadHistory();
     };
     box.appendChild(row);
   });
@@ -829,7 +1043,12 @@ async function init() {
   const userFromSession = localStorage.getItem("ttx_user");
   if (userFromSession) {
     state.user = userFromSession;
-    switchView("storeView");
+    const rememberedStore = localStorage.getItem(`ttx_store_${state.user}`);
+    if (rememberedStore) {
+      await selectStore(rememberedStore);
+    } else {
+      switchView("storeView");
+    }
     loadHistory();
   } else {
     switchView("loginView");
@@ -866,6 +1085,7 @@ function setLoginLoading(show) {
 
 async function completeLogin(user) {
   state.user = user;
+  state.activeSessionId = null;
   localStorage.setItem("ttx_user", state.user);
   switchView("storeView");
   loadHistory();
@@ -918,6 +1138,7 @@ $("workspaceHistorialBtn").onclick = () => { closeAllDrawers(); state.historyMod
 $("closeHistoryModal").onclick = () => $("historyModal").classList.add("hidden");
 $("historyExportsTab").onclick = () => { state.historyMode = "exports"; state.historyPage = 1; updateHistoryTabs(); loadHistory(); };
 $("historyConversionsTab").onclick = () => { state.historyMode = "conversions"; state.conversionHistoryPage = 1; updateHistoryTabs(); loadHistory(); };
+$("historySessionsTab").onclick = () => { state.historyMode = "sessions"; state.sessionsPage = 1; updateHistoryTabs(); loadHistory(); };
 
 $("menuCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("categoriesView"); renderCategoryList(); };
 $("workspaceCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("categoriesView"); renderCategoryList(); };
@@ -981,6 +1202,7 @@ const doLogout = () => {
   localStorage.removeItem("ttx_user");
   state.user = null;
   state.currentStore = null;
+  state.activeSessionId = null;
   switchView("loginView");
 };
 
