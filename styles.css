@@ -42,6 +42,7 @@ input, select { border-radius: 14px; border: 1px solid #d2d7e1; padding: 11px 12
 .store-btn img { max-width: 380px; max-height: 90px; object-fit: contain; }
 .drawer { position: fixed; top: 0; left: -340px; width: 320px; height: 100vh; background: #fff; z-index: 40; box-shadow: var(--shadow); transition: left .25s ease; }
 .drawer.open { left: 0; }
+#workspaceDrawer { border-bottom-right-radius: 14px; overflow: hidden; }
 .drawer-content { padding: 20px; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
 .drawer-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .drawer-logo { height: 50px; width: auto; }
