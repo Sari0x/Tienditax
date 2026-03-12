@@ -31,7 +31,9 @@ function preferenceThemeKey(user) {
 }
 
 function loadUserThemePreference(user) {
-  const saved = localStorage.getItem(preferenceThemeKey(user));
+  const byUser = user ? localStorage.getItem(preferenceThemeKey(user)) : null;
+  const lastTheme = localStorage.getItem("ttx_theme_last");
+  const saved = byUser ?? lastTheme;
   state.theme = saved === "dark" ? "dark" : "light";
 }
 
@@ -45,6 +47,7 @@ function applyUserPreferences() {
 
 function persistUserPreferences() {
   localStorage.setItem(preferenceThemeKey(state.user), state.theme);
+  localStorage.setItem("ttx_theme_last", state.theme);
 }
 
 function setTheme(theme) {
@@ -1168,6 +1171,9 @@ async function init() {
     }
     loadHistory();
   } else {
+    const lastUser = localStorage.getItem("ttx_last_user");
+    loadUserThemePreference(lastUser);
+    applyUserPreferences();
     switchView("loginView");
   }
 }
@@ -1204,6 +1210,7 @@ async function completeLogin(user) {
   state.user = user;
   state.activeSessionId = null;
   localStorage.setItem("ttx_user", state.user);
+  localStorage.setItem("ttx_last_user", state.user);
   loadUserThemePreference(state.user);
   applyUserPreferences();
   switchView("storeView");
