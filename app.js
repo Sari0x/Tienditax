@@ -189,6 +189,41 @@ async function resolveSessionOnStoreOpen() {
 
 
 
+function excelSerialToDateString(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return "";
+  const parsed = XLSX.SSF?.parse_date_code ? XLSX.SSF.parse_date_code(num) : null;
+  if (!parsed || !parsed.y || !parsed.m || !parsed.d) return "";
+  const yyyy = String(parsed.y).padStart(4, "0");
+  const mm = String(parsed.m).padStart(2, "0");
+  const dd = String(parsed.d).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeDateFieldValue(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const serialLike = /^\d+(\.\d+)?$/.test(raw);
+  if (!serialLike) return raw;
+
+  const serialConverted = excelSerialToDateString(raw);
+  return serialConverted || raw;
+}
+
+function normalizeEditableExportRow(row, targetStore) {
+  const fields = STORE_FIELDS[targetStore] || STORE_FIELDS.bna;
+  const normalized = defaultRow();
+  fields.forEach((field) => {
+    if (row[field] === undefined) return;
+    const value = DATE_FIELDS.includes(field) ? normalizeDateFieldValue(row[field]) : String(row[field] ?? "");
+    normalized[field] = value;
+  });
+  normalized["Transaction Type"] = "purchasable";
+  return normalized;
+}
+
 function parseStoredCsvToProducts(csv, targetStore) {
   if (!csv || typeof csv !== "string") return [];
   try {
@@ -197,7 +232,6 @@ function parseStoredCsvToProducts(csv, targetStore) {
     const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: "" });
     if (!Array.isArray(rows) || rows.length < 2) return [];
     const [headers, ...body] = rows;
-    const fields = STORE_FIELDS[targetStore] || STORE_FIELDS.bna;
     return body
       .filter((row) => Array.isArray(row) && row.some((cell) => String(cell ?? "").trim()))
       .map((row) => {
@@ -205,12 +239,7 @@ function parseStoredCsvToProducts(csv, targetStore) {
         headers.forEach((header, idx) => {
           mapped[String(header || "")] = row[idx] ?? "";
         });
-        const normalized = defaultRow();
-        fields.forEach((field) => {
-          if (mapped[field] !== undefined) normalized[field] = String(mapped[field] ?? "");
-        });
-        normalized["Transaction Type"] = "purchasable";
-        return normalized;
+        return normalizeEditableExportRow(mapped, targetStore);
       });
   } catch (err) {
     console.error("No se pudo parsear CSV guardado", err);
@@ -220,7 +249,7 @@ function parseStoredCsvToProducts(csv, targetStore) {
 
 function extractEditableProductsFromExport(exportItem, targetStore) {
   if (Array.isArray(exportItem?.productos) && exportItem.productos.length) {
-    return exportItem.productos;
+    return exportItem.productos.map((row) => normalizeEditableExportRow(row, targetStore));
   }
   return parseStoredCsvToProducts(exportItem?.csv, targetStore);
 }
