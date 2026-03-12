@@ -689,6 +689,15 @@ function renderSkuSuggestions(inputEl, rowIdx) {
   });
 }
 
+
+function positionInlineAddButton() {
+  const container = $("tableContainer");
+  const addWrap = container?.querySelector(".add-row-inline-wrap");
+  if (!container || !addWrap) return;
+  const x = Math.max(12, container.scrollLeft + container.clientWidth - 72);
+  addWrap.style.left = `${x}px`;
+}
+
 function syncTopScrollbar() {
   const container = $("tableContainer");
   const topScroll = $("tableTopScroll");
@@ -699,6 +708,7 @@ function syncTopScrollbar() {
   topInner.style.width = `${fullWidth}px`;
   const showTopScroll = container.scrollWidth > container.clientWidth;
   topScroll.classList.toggle("hidden", !showTopScroll);
+  positionInlineAddButton();
 }
 
 function buildWorkspace() {
@@ -751,10 +761,12 @@ function buildWorkspace() {
   requestAnimationFrame(syncTopScrollbar);
   container.onscroll = () => {
     if (topScroll && topScroll.scrollLeft !== container.scrollLeft) topScroll.scrollLeft = container.scrollLeft;
+    positionInlineAddButton();
   };
   if (topScroll) {
     topScroll.onscroll = () => {
       if (container.scrollLeft !== topScroll.scrollLeft) container.scrollLeft = topScroll.scrollLeft;
+      positionInlineAddButton();
     };
   }
   requestAnimationFrame(() => {
@@ -762,6 +774,7 @@ function buildWorkspace() {
     container.scrollTop = previousScrollTop;
     if (topScroll) topScroll.scrollLeft = previousScrollLeft;
     window.scrollTo(previousWindowX, previousWindowY);
+    positionInlineAddButton();
   });
 
   container.querySelectorAll("input[data-row], select[data-row]").forEach((control) => {

@@ -73,10 +73,10 @@ input, select { border-radius: 14px; border: 1px solid var(--line); padding: 11p
 .ios-btn.soft-danger:hover { background: #ffd7d4; }
 .table-top-scroll { overflow-x: auto; overflow-y: hidden; width: 100%; box-sizing: border-box; background: var(--surface-1); border-radius: 18px 18px 0 0; box-shadow: var(--shadow); margin: 0; }
 .table-top-scroll > div { height: 12px; }
-#tableContainer { background: var(--surface-1); border-radius: 0 0 18px 18px; box-shadow: var(--shadow); padding: 12px; min-height: calc(100vh - 180px); overflow-x: auto; margin-top: 0; }
+#tableContainer { background: var(--surface-1); border-radius: 0 0 18px 18px; box-shadow: var(--shadow); padding: 12px; padding-bottom: 56px; min-height: calc(100vh - 180px); overflow-x: auto; margin-top: 0; position: relative; }
 .rows-wrap { display: flex; flex-direction: column; gap: 10px; min-width: max-content; }
 
-.add-row-inline-wrap { display: flex; justify-content: center; padding: 12px 0 4px; }
+.add-row-inline-wrap { position: sticky; bottom: 12px; left: 12px; width: 0; padding: 0; z-index: 25; pointer-events: none; }
 .add-row-inline-btn {
   border: none;
   border-radius: 999px;
@@ -93,6 +93,7 @@ input, select { border-radius: 14px; border: 1px solid var(--line); padding: 11p
   justify-content: center;
 }
 .add-row-inline-btn:hover { transform: translateY(-1px); }
+.add-row-inline-btn { pointer-events: auto; box-shadow: var(--shadow); }
 .product-row { border: 1px solid var(--line); border-radius: 14px; padding: 10px; overflow: visible; display: flex; align-items: flex-start; gap: 8px; background: var(--surface-1); }
 .row-delete-btn { border: none; background: #ffe9e8; color: #c81e1e; border-radius: 10px; width: 34px; height: 34px; cursor: pointer; flex: 0 0 auto; margin-top: 18px; }
 .row-delete-btn:hover { background: #ffd7d4; }
