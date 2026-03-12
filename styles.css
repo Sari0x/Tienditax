@@ -134,3 +134,52 @@ footer { min-height: 92px; display: flex; justify-content: space-between; align-
 #toastContainer { position: fixed; right: 16px; bottom: 72px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
 .toast { background: #1f2937; color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; box-shadow: var(--shadow); }
 @media (max-width: 900px) { .workspace-topbar, .topbar { display: flex; flex-wrap: wrap; } .brand-logo { width: 340px; } }
+
+.history-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ios-btn.ghost.active {
+  background: #0a53d0;
+  color: #fff;
+}
+
+.converter-options-row {
+  margin-top: 8px;
+}
+
+.converter-field-block {
+  flex: 1;
+}
+
+.converter-logs {
+  background: #f6f8fc;
+  border: 1px solid #dbe4f2;
+  border-radius: 14px;
+  padding: 10px;
+  min-height: 130px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.converter-log-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  border-bottom: 1px dashed #d8dfeb;
+  font-size: 13px;
+}
+
+.converter-log-item:last-child {
+  border-bottom: none;
+}
+
+.mini-spinner {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  animation: spin 1s linear infinite;
+}
