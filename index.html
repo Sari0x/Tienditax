@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   </head>
   <body>
     <div id="app">
@@ -43,6 +44,7 @@
             </div>
             <button id="menuHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="menuCategoriesBtn" class="ios-btn ghost">Categorías</button>
+            <button id="menuConverterBtn" class="ios-btn ghost">Convertidor</button>
             <div class="drawer-spacer"></div>
             <button id="menuLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
@@ -72,6 +74,7 @@
             </div>
             <button id="workspaceHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="workspaceCategoriesBtn" class="ios-btn ghost">Categorías</button>
+            <button id="workspaceConverterBtn" class="ios-btn ghost">Convertidor</button>
             <div class="drawer-spacer"></div>
             <button id="workspaceLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
@@ -120,11 +123,59 @@
     <div id="historyModal" class="modal hidden">
       <div class="modal-card">
         <div class="drawer-header">
-          <h3>Historial de exports</h3>
+          <div class="history-header-actions">
+            <button id="historyExportsTab" class="ios-btn ghost small active">Historial de exports</button>
+            <button id="historyConversionsTab" class="ios-btn ghost small">Historial de conversión</button>
+          </div>
           <button id="closeHistoryModal" class="icon-btn close-btn">✕</button>
         </div>
         <div id="historyPagination" class="history-pagination"></div>
         <div id="historyList" class="list"></div>
+      </div>
+    </div>
+
+    <div id="converterModal" class="modal hidden">
+      <div class="modal-card">
+        <div class="drawer-header">
+          <h3>Convertidor de archivos</h3>
+          <button id="closeConverterModal" class="icon-btn close-btn">✕</button>
+        </div>
+
+        <div class="field-row converter-options-row">
+          <div class="field-block converter-field-block">
+            <label>Formato de origen</label>
+            <select id="sourceFormatSelect">
+              <option value="xlsx">XLSX</option>
+              <option value="xls">XLS</option>
+              <option value="csv">CSV</option>
+              <option value="txt">TXT</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+          <div class="field-block converter-field-block">
+            <label>Formato de destino</label>
+            <select id="targetFormatSelect">
+              <option value="csv">CSV</option>
+              <option value="xlsx">XLSX</option>
+              <option value="txt">TXT</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row converter-files-row">
+          <label class="file-upload ios-btn ghost">
+            Importar archivos
+            <input id="converterFilesInput" type="file" multiple />
+          </label>
+          <span id="converterFilesInfo" class="converter-files-info">Sin archivos seleccionados</span>
+        </div>
+
+        <div class="field-row">
+          <button id="startConversionBtn" class="ios-btn primary">Convertir y exportar</button>
+        </div>
+
+        <div id="converterLogs" class="converter-logs"></div>
       </div>
     </div>
 
