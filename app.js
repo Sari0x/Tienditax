@@ -188,6 +188,9 @@ async function startConversion() {
   clearConverterLogs();
   const prepLog = addConverterLog(`Preparando ${files.length} archivo(s) para convertir de ${sourceFormat.toUpperCase()} a ${targetFormat.toUpperCase()}...`, true);
 
+  const waitLog = addConverterLog("⏳ Procesando conversión (aprox. 3 segundos)...", true);
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
   const converted = [];
   for (const file of files) {
     const loadingLog = addConverterLog(`Convirtiendo ${file.name}...`, true);
@@ -196,6 +199,7 @@ async function startConversion() {
     completeConverterLog(loadingLog, `✅ ${file.name} convertido a ${output.filename}`);
   }
   completeConverterLog(prepLog, "✅ Preparación finalizada");
+  completeConverterLog(waitLog, "✅ Tiempo de procesamiento completado");
 
   const label = buildConversionLabel();
   const safeLabel = sanitizeFilename(label);
