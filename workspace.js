@@ -4,9 +4,9 @@ const FIREBASE_DB_URL = "https://tienditax-default-rtdb.firebaseio.com";
 const FIREBASE_STORAGE_BUCKET = "tienditax.appspot.com";
 
 const COMPANY_OPTIONS = [
-  { value: "napse", label: "Napse", short: "N", color: "#0ea5e9" },
-  { value: "cygnus", label: "Cygnus", short: "C", color: "#14b8a6" },
-  { value: "softland", label: "Softland", short: "S", color: "#8b5cf6" },
+  { value: "napse", label: "Napse", short: "N", color: "#0ea5e9", logo: "https://i.postimg.cc/wBJSJkWt/napse-logo.png" },
+  { value: "cygnus", label: "Cygnus", short: "C", color: "#14b8a6", logo: "https://i.postimg.cc/VNM3MF76/cygnus-logo.png" },
+  { value: "softland", label: "Softland", short: "S", color: "#8b5cf6", logo: "https://i.postimg.cc/BvDdDChj/softland-logo.png" },
 ];
 
 const LINK_OPTIONS = [
@@ -280,9 +280,16 @@ function detectLinkTypeFromUrl(urlValue) {
   return "otro";
 }
 
+function companyLogoHtml(company, size = 26) {
+  if (company.logo) {
+    return `<img src="${company.logo}" alt="${company.label}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:6px;background:#fff;padding:1px;" />`;
+  }
+  return `<span class="logo-badge" style="background:${company.color};width:${size}px;height:${size}px;border-radius:6px;font-size:9px">${company.short}</span>`;
+}
+
 function renderCompanyLogo() {
   const company = companyByValue($("eventCompany").value);
-  $("eventCompanyLogo").innerHTML = `<span class="logo-badge" style="background:${company.color}" title="${company.label}">${company.short}</span><small>${company.label}</small>`;
+  $("eventCompanyLogo").innerHTML = `${companyLogoHtml(company)}<small>${company.label}</small>`;
 }
 
 function renderLinkLogo() {
@@ -599,7 +606,7 @@ function initCalendar() {
       const attachmentMark = ext.attachments?.length ? "📎" : "";
       const wrap = document.createElement("div");
       wrap.innerHTML = `<div style="display:flex;align-items:center;gap:5px;min-width:0;">
-        <span class="logo-badge" style="background:${company.color};width:18px;height:18px;border-radius:6px;font-size:9px">${company.short}</span>
+        ${companyLogoHtml(company, 18)}
         <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${arg.event.title} ${attachmentMark}</span>
       </div>
       <span class="status-pill" style="background:${status.color}">${status.label}</span>`;
