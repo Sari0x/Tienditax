@@ -289,7 +289,7 @@ function companyLogoHtml(company, size = 74) {
 
 function renderCompanyLogo() {
   const company = companyByValue($("eventCompany").value);
-  $("eventCompanyLogo").innerHTML = `${companyLogoHtml(company)}<small>${company.label}</small>`;
+  $("eventCompanyLogo").innerHTML = companyLogoHtml(company);
 }
 
 function renderLinkLogo() {
@@ -298,7 +298,7 @@ function renderLinkLogo() {
     $("eventLinkType").value = autoType;
   }
   const link = linkByValue(autoType || $("eventLinkType").value);
-  $("eventLinkLogo").innerHTML = `<span class="logo-badge" style="background:${link.color}" title="${link.label}"><i class="bi ${link.icon}"></i></span><small>${link.label}</small>`;
+  $("eventLinkLogo").innerHTML = `<span class="logo-badge" style="background:${link.color}" title="${link.label}"><i class="bi ${link.icon}"></i></span>`;
 }
 
 function updateColorPreview(value) {
