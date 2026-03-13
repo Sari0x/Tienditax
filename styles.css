@@ -40,7 +40,7 @@ body { margin: 0; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Sego
 .login-card { max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
 .brand-logo { width: 350px; max-width: 100%; align-self: center; }
 .login-btn { margin-top: 14px; }
-input, select { border-radius: 14px; border: 1px solid var(--line); padding: 11px 12px; font-size: 14px; background: var(--surface-1); color: var(--text); }
+input, select, textarea { border-radius: 14px; border: 1px solid var(--line); padding: 11px 12px; font-size: 14px; background: var(--surface-1); color: var(--text); font-family: inherit; }
 .password-wrap { display: flex; gap: 8px; align-items: center; }
 .password-wrap input { flex: 1; }
 .link-btn { border: none; background: transparent; color: var(--blue); font-weight: 700; cursor: pointer; }
@@ -242,6 +242,148 @@ footer { min-height: 92px; display: flex; justify-content: space-between; align-
   padding-top: 6px;
   border-top: 1px solid var(--line);
   margin-top: 4px;
+}
+
+.calendar-modal-card {
+  width: min(1200px, 95vw);
+  overflow-x: hidden;
+}
+
+.calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.calendar-shell {
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.calendar-event-panel {
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+#calendarEventDetails {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+}
+
+
+.calendar-color-row {
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.calendar-color-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+#calendarEventColor {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.calendar-color-preview {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #0a53d0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.calendar-color-text {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.calendar-all-day-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.calendar-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.fc .fc-button-primary {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number,
+.fc .fc-list-day-text,
+.fc .fc-list-day-side-text {
+  color: var(--text);
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th,
+.fc-theme-standard .fc-scrollgrid {
+  border-color: var(--line);
+}
+
+body.dark .fc {
+  --fc-page-bg-color: #0b1220;
+  --fc-neutral-bg-color: #121a2d;
+  --fc-list-event-hover-bg-color: #1b2438;
+  --fc-border-color: #26314a;
+  --fc-today-bg-color: rgba(56, 133, 255, 0.15);
+  --fc-neutral-text-color: #dce7ff;
+}
+
+body.dark .calendar-shell,
+body.dark .calendar-event-panel {
+  background: var(--surface-1);
+}
+
+body.dark .calendar-color-picker {
+  background: var(--surface-1);
+}
+
+body.dark .calendar-color-preview {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+@media (max-width: 1080px) {
+  .calendar-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-color-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .setting-switch {

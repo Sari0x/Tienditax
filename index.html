@@ -10,10 +10,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" />
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
   </head>
   <body>
     <div id="app">
@@ -46,6 +48,7 @@
             <button id="menuHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="menuCategoriesBtn" class="ios-btn ghost">Categorías</button>
             <button id="menuConverterBtn" class="ios-btn ghost">Convertidor</button>
+            <button id="menuCalendarBtn" class="ios-btn ghost">Calendario</button>
             <div class="preferences-panel drawer-preferences">
               <label class="setting-switch" for="themeToggleMenu">
                 <span class="setting-label"><i class="bi bi-moon-stars"></i> Modo oscuro</span>
@@ -54,6 +57,7 @@
               </label>
             </div>
             <div class="drawer-spacer"></div>
+            <button id="menuWorkspacePageBtn" class="ios-btn ghost">Workspace</button>
             <button id="menuLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
         </div>
@@ -83,6 +87,7 @@
             <button id="workspaceHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="workspaceCategoriesBtn" class="ios-btn ghost">Categorías</button>
             <button id="workspaceConverterBtn" class="ios-btn ghost">Convertidor</button>
+            <button id="workspaceCalendarBtn" class="ios-btn ghost">Calendario</button>
             <div class="preferences-panel drawer-preferences">
               <label class="setting-switch" for="themeToggleWorkspace">
                 <span class="setting-label"><i class="bi bi-moon-stars"></i> Modo oscuro</span>
@@ -91,6 +96,7 @@
               </label>
             </div>
             <div class="drawer-spacer"></div>
+            <button id="workspaceWorkspacePageBtn" class="ios-btn ghost">Workspace</button>
             <button id="workspaceLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
         </div>
@@ -192,6 +198,47 @@
         </div>
 
         <div id="converterLogs" class="converter-logs"></div>
+      </div>
+    </div>
+
+    <div id="calendarModal" class="modal hidden">
+      <div class="modal-card calendar-modal-card">
+        <div class="drawer-header">
+          <h3>Calendario</h3>
+          <button id="closeCalendarModal" class="icon-btn close-btn">✕</button>
+        </div>
+        <div class="calendar-layout">
+          <div id="calendarContainer" class="calendar-shell"></div>
+          <div class="calendar-event-panel">
+            <h4 id="calendarFormTitle">Nuevo evento</h4>
+            <div class="field-row">
+              <input id="calendarEventTitle" type="text" placeholder="Título del evento" />
+            </div>
+            <div class="field-row">
+              <textarea id="calendarEventDetails" placeholder="Detalle del evento"></textarea>
+            </div>
+            <div class="field-row">
+              <input id="calendarEventStart" type="datetime-local" />
+              <input id="calendarEventEnd" type="datetime-local" />
+            </div>
+            <div class="field-row calendar-color-row">
+              <label class="calendar-color-picker" for="calendarEventColor">
+                <input id="calendarEventColor" type="color" value="#0a53d0" aria-label="Elegir color del evento" />
+                <span id="calendarColorPreview" class="calendar-color-preview" aria-hidden="true"></span>
+                <span class="calendar-color-text">Color del evento</span>
+              </label>
+              <label class="calendar-all-day-label">
+                <input id="calendarEventAllDay" type="checkbox" />
+                Todo el día
+              </label>
+            </div>
+            <div class="confirm-actions calendar-actions">
+              <button id="calendarSaveBtn" class="ios-btn primary small">Guardar evento</button>
+              <button id="calendarDeleteBtn" class="ios-btn danger small hidden">Eliminar</button>
+              <button id="calendarCancelEditBtn" class="ios-btn ghost small hidden">Cancelar edición</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
