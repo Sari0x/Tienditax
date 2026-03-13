@@ -94,6 +94,53 @@ function resetCalendarForm() {
   $("calendarCancelEditBtn").classList.add("hidden");
 }
 
+function toLocalDateTimeValue(date) {
+  if (!date) return "";
+  return new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+}
+
+function parseYmdAsLocalDate(value) {
+  if (!value) return null;
+  const [year, month, day] = String(value).split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toYmd(date) {
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeCalendarEventDates(startInput, endInput, allDay) {
+  if (!allDay) {
+    return { start: startInput, end: endInput || null };
+  }
+
+  const startDate = new Date(startInput);
+  if (Number.isNaN(startDate.getTime())) return null;
+
+  const startYmd = toYmd(startDate);
+  if (!endInput) return { start: startYmd, end: null };
+
+  const endDateRaw = new Date(endInput);
+  if (Number.isNaN(endDateRaw.getTime())) return { start: startYmd, end: null };
+
+  const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const endDay = new Date(endDateRaw.getFullYear(), endDateRaw.getMonth(), endDateRaw.getDate());
+  const inclusiveEnd = endDay < startDay ? startDay : endDay;
+  const exclusiveEnd = addDays(inclusiveEnd, 1);
+
+  return { start: startYmd, end: toYmd(exclusiveEnd) };
+}
+
 function syncCalendarEventsFromInstance() {
   if (!calendarInstance) return;
   state.calendarEvents = calendarInstance.getEvents().map((event) => ({
@@ -115,16 +162,33 @@ function loadEventInForm(event) {
   $("calendarEventDetails").value = event.extendedProps?.details || "";
   $("calendarEventColor").value = event.backgroundColor || event.borderColor || "#0a53d0";
   $("calendarEventAllDay").checked = !!event.allDay;
-  $("calendarEventStart").value = event.start ? new Date(event.start.getTime() - (event.start.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : "";
-  $("calendarEventEnd").value = event.end ? new Date(event.end.getTime() - (event.end.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : "";
+
+  if (event.allDay) {
+    $("calendarEventStart").value = event.startStr ? `${event.startStr}T00:00` : "";
+    if (event.endStr) {
+      const endDate = parseYmdAsLocalDate(event.endStr);
+      $("calendarEventEnd").value = endDate ? `${toYmd(addDays(endDate, -1))}T00:00` : "";
+    } else {
+      $("calendarEventEnd").value = "";
+    }
+  } else {
+    $("calendarEventStart").value = event.start ? toLocalDateTimeValue(event.start) : "";
+    $("calendarEventEnd").value = event.end ? toLocalDateTimeValue(event.end) : "";
+  }
+
   $("calendarDeleteBtn").classList.remove("hidden");
   $("calendarCancelEditBtn").classList.remove("hidden");
 }
 
 function prefillCalendarFormFromSelection(info) {
   resetCalendarForm();
-  $("calendarEventStart").value = info.start ? new Date(info.start.getTime() - (info.start.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : "";
-  $("calendarEventEnd").value = info.end ? new Date(info.end.getTime() - (info.end.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : "";
+  $("calendarEventStart").value = info.start ? toLocalDateTimeValue(info.start) : "";
+  if (info.allDay && info.end) {
+    const inclusiveEnd = addDays(info.end, -1);
+    $("calendarEventEnd").value = toLocalDateTimeValue(inclusiveEnd);
+  } else {
+    $("calendarEventEnd").value = info.end ? toLocalDateTimeValue(info.end) : "";
+  }
   $("calendarEventAllDay").checked = !!info.allDay;
 }
 
@@ -178,19 +242,22 @@ function saveCalendarEvent() {
   if (!calendarInstance) return;
   const title = $("calendarEventTitle").value.trim();
   const details = $("calendarEventDetails").value.trim();
-  const start = $("calendarEventStart").value;
-  const end = $("calendarEventEnd").value;
+  const startInput = $("calendarEventStart").value;
+  const endInput = $("calendarEventEnd").value;
   const color = $("calendarEventColor").value || "#0a53d0";
   const allDay = $("calendarEventAllDay").checked;
-  if (!title || !start) return showToast("Completá título y fecha de inicio");
+  if (!title || !startInput) return showToast("Completá título y fecha de inicio");
+
+  const normalizedDates = normalizeCalendarEventDates(startInput, endInput, allDay);
+  if (!normalizedDates) return showToast("Fecha inválida");
 
   if (state.calendarEditingId) {
     const existing = calendarInstance.getEventById(state.calendarEditingId);
     if (!existing) return;
-    existing.setProp("title", title);
-    existing.setStart(start);
-    existing.setEnd(end || null);
     existing.setAllDay(allDay);
+    existing.setProp("title", title);
+    existing.setStart(normalizedDates.start);
+    existing.setEnd(normalizedDates.end);
     existing.setExtendedProp("details", details);
     existing.setProp("backgroundColor", color);
     existing.setProp("borderColor", color);
@@ -198,8 +265,8 @@ function saveCalendarEvent() {
     calendarInstance.addEvent({
       id: `ev_${Date.now()}`,
       title,
-      start,
-      end: end || null,
+      start: normalizedDates.start,
+      end: normalizedDates.end,
       allDay,
       backgroundColor: color,
       borderColor: color,
