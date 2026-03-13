@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tienditax Workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" />
+    <link rel="stylesheet" href="workspace.css" />
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+  </head>
+  <body>
+    <header class="workspace-topbar">
+      <div class="topbar-left">
+        <h1>Workspace</h1>
+        <span class="subtitle">Calendario de proyectos y eventos</span>
+      </div>
+      <div class="topbar-actions">
+        <button id="backAppBtn" class="btn ghost"><i class="bi bi-arrow-left"></i> Volver a Tienditax</button>
+      </div>
+    </header>
+
+    <main class="workspace-layout">
+      <section class="calendar-panel">
+        <div id="workspaceCalendar"></div>
+      </section>
+
+      <aside class="side-panel">
+        <section class="card">
+          <h2 id="eventFormTitle">Nuevo evento/proyecto</h2>
+          <div class="field-block">
+            <label for="eventTitle">Título</label>
+            <input id="eventTitle" type="text" placeholder="Ej: Integración API" />
+          </div>
+          <div class="field-block">
+            <label for="eventDetails">Detalle</label>
+            <textarea id="eventDetails" placeholder="Notas, objetivos, entregables..."></textarea>
+          </div>
+          <div class="field-row">
+            <div class="field-block">
+              <label for="eventStart">Inicio</label>
+              <input id="eventStart" type="datetime-local" />
+            </div>
+            <div class="field-block">
+              <label for="eventEnd">Fin</label>
+              <input id="eventEnd" type="datetime-local" />
+            </div>
+          </div>
+          <div class="field-row middle">
+            <label class="check-wrap"><input id="eventAllDay" type="checkbox" /> Todo el día</label>
+            <label class="check-wrap color-wrap" for="eventColor">
+              <input id="eventColor" type="color" value="#2563eb" aria-label="Color del evento" />
+              <span id="eventColorPreview" class="color-preview"></span>
+              Color
+            </label>
+          </div>
+          <div class="field-block">
+            <label for="eventAssignees">Asignar personas</label>
+            <select id="eventAssignees" multiple></select>
+            <small>Podés seleccionar una o más personas (Ctrl/Cmd + click).</small>
+          </div>
+          <div class="field-row">
+            <div class="field-block">
+              <label for="eventCompany">Empresa</label>
+              <select id="eventCompany"></select>
+            </div>
+            <div class="field-block logos-inline" id="eventCompanyLogo"></div>
+          </div>
+          <div class="field-row">
+            <div class="field-block">
+              <label for="eventStatus">Estado</label>
+              <select id="eventStatus">
+                <option value="sin_estado">Sin estado</option>
+                <option value="en_proceso">En proceso</option>
+                <option value="finalizado">Finalizado</option>
+              </select>
+            </div>
+            <div class="field-block">
+              <label for="eventLinkType">Tipo de link</label>
+              <select id="eventLinkType"></select>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-block">
+              <label for="eventLinkUrl">Link del evento</label>
+              <input id="eventLinkUrl" type="url" placeholder="https://meet.google.com/..." />
+            </div>
+            <div class="field-block logos-inline" id="eventLinkLogo"></div>
+          </div>
+          <div class="field-block">
+            <label for="eventAttachmentsInput">Adjuntar archivos (se guardan en Firebase Storage)</label>
+            <input id="eventAttachmentsInput" type="file" multiple />
+            <div id="eventAttachmentsList" class="attachments-list"></div>
+          </div>
+          <div class="actions">
+            <button id="saveEventBtn" class="btn primary">Guardar</button>
+            <button id="deleteEventBtn" class="btn danger hidden">Eliminar</button>
+            <button id="cancelEditEventBtn" class="btn ghost hidden">Cancelar edición</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Perfiles</h2>
+          <div class="field-row">
+            <input id="profileName" type="text" placeholder="Nombre" />
+            <input id="profileLastName" type="text" placeholder="Apellido" />
+          </div>
+          <div class="field-block">
+            <input id="profileMail" type="email" placeholder="mail@dominio.com" />
+          </div>
+          <button id="createProfileBtn" class="btn primary">Crear perfil</button>
+          <div id="profilesList" class="profiles-list"></div>
+        </section>
+      </aside>
+    </main>
+
+    <script src="workspace.js"></script>
+  </body>
+</html>
