@@ -81,6 +81,11 @@ function persistCalendarEvents() {
   localStorage.setItem(calendarStorageKey(), JSON.stringify(state.calendarEvents));
 }
 
+function updateCalendarColorPreview(color) {
+  const value = color || "#0a53d0";
+  if ($("calendarColorPreview")) $("calendarColorPreview").style.background = value;
+}
+
 function resetCalendarForm() {
   state.calendarEditingId = null;
   $("calendarFormTitle").textContent = "Nuevo evento";
@@ -89,6 +94,7 @@ function resetCalendarForm() {
   $("calendarEventStart").value = "";
   $("calendarEventEnd").value = "";
   $("calendarEventColor").value = "#0a53d0";
+  updateCalendarColorPreview("#0a53d0");
   $("calendarEventAllDay").checked = false;
   $("calendarDeleteBtn").classList.add("hidden");
   $("calendarCancelEditBtn").classList.add("hidden");
@@ -161,6 +167,7 @@ function loadEventInForm(event) {
   $("calendarEventTitle").value = event.title || "";
   $("calendarEventDetails").value = event.extendedProps?.details || "";
   $("calendarEventColor").value = event.backgroundColor || event.borderColor || "#0a53d0";
+  updateCalendarColorPreview($("calendarEventColor").value);
   $("calendarEventAllDay").checked = !!event.allDay;
 
   if (event.allDay) {
@@ -1499,6 +1506,7 @@ $("menuCalendarBtn").onclick = openCalendarModal;
 $("workspaceCalendarBtn").onclick = openCalendarModal;
 $("closeCalendarModal").onclick = () => $("calendarModal").classList.add("hidden");
 $("calendarSaveBtn").onclick = saveCalendarEvent;
+$("calendarEventColor").oninput = (e) => updateCalendarColorPreview(e.target.value);
 $("calendarCancelEditBtn").onclick = resetCalendarForm;
 $("calendarDeleteBtn").onclick = () => {
   if (!calendarInstance || !state.calendarEditingId) return;

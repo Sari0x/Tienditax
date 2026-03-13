@@ -219,8 +219,12 @@
               <input id="calendarEventStart" type="datetime-local" />
               <input id="calendarEventEnd" type="datetime-local" />
             </div>
-            <div class="field-row">
-              <input id="calendarEventColor" type="color" value="#0a53d0" />
+            <div class="field-row calendar-color-row">
+              <label class="calendar-color-picker" for="calendarEventColor">
+                <input id="calendarEventColor" type="color" value="#0a53d0" aria-label="Elegir color del evento" />
+                <span id="calendarColorPreview" class="calendar-color-preview" aria-hidden="true"></span>
+                <span class="calendar-color-text">Color del evento</span>
+              </label>
               <label class="calendar-all-day-label">
                 <input id="calendarEventAllDay" type="checkbox" />
                 Todo el día

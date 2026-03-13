@@ -246,23 +246,27 @@ footer { min-height: 92px; display: flex; justify-content: space-between; align-
 
 .calendar-modal-card {
   width: min(1200px, 95vw);
+  overflow-x: hidden;
 }
 
 .calendar-layout {
   display: grid;
-  grid-template-columns: 1.7fr 1fr;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
   gap: 14px;
   align-items: start;
 }
 
 .calendar-shell {
+  min-width: 0;
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 10px;
+  overflow: hidden;
 }
 
 .calendar-event-panel {
+  min-width: 0;
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -273,6 +277,45 @@ footer { min-height: 92px; display: flex; justify-content: space-between; align-
   width: 100%;
   min-height: 120px;
   resize: vertical;
+}
+
+
+.calendar-color-row {
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.calendar-color-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+#calendarEventColor {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.calendar-color-preview {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #0a53d0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.calendar-color-text {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 13px;
 }
 
 .calendar-all-day-label {
@@ -324,9 +367,22 @@ body.dark .calendar-event-panel {
   background: var(--surface-1);
 }
 
+body.dark .calendar-color-picker {
+  background: var(--surface-1);
+}
+
+body.dark .calendar-color-preview {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
 @media (max-width: 1080px) {
   .calendar-layout {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-color-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
