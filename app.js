@@ -18,7 +18,8 @@ const CATEGORY_STORE_OPTIONS = [
 
 const ADMIN_USER = "manusario";
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null, theme: "light" };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null, theme: "light", calendarEvents: [], calendarEditingId: null };
+let calendarInstance = null;
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
@@ -60,6 +61,229 @@ function bindPreferenceSwitch(id, onChange) {
   const el = $(id);
   if (!el) return;
   el.onchange = (e) => onChange(e.target.checked);
+}
+
+function calendarStorageKey() {
+  return `ttx_calendar_events_${state.user || "guest"}`;
+}
+
+function loadCalendarEvents() {
+  try {
+    const raw = localStorage.getItem(calendarStorageKey());
+    const parsed = JSON.parse(raw || "[]");
+    state.calendarEvents = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    state.calendarEvents = [];
+  }
+}
+
+function persistCalendarEvents() {
+  localStorage.setItem(calendarStorageKey(), JSON.stringify(state.calendarEvents));
+}
+
+function updateCalendarColorPreview(color) {
+  const value = color || "#0a53d0";
+  if ($("calendarColorPreview")) $("calendarColorPreview").style.background = value;
+}
+
+function resetCalendarForm() {
+  state.calendarEditingId = null;
+  $("calendarFormTitle").textContent = "Nuevo evento";
+  $("calendarEventTitle").value = "";
+  $("calendarEventDetails").value = "";
+  $("calendarEventStart").value = "";
+  $("calendarEventEnd").value = "";
+  $("calendarEventColor").value = "#0a53d0";
+  updateCalendarColorPreview("#0a53d0");
+  $("calendarEventAllDay").checked = false;
+  $("calendarDeleteBtn").classList.add("hidden");
+  $("calendarCancelEditBtn").classList.add("hidden");
+}
+
+function toLocalDateTimeValue(date) {
+  if (!date) return "";
+  return new Date(date.getTime() - (date.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+}
+
+function parseYmdAsLocalDate(value) {
+  if (!value) return null;
+  const [year, month, day] = String(value).split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(year, month - 1, day);
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toYmd(date) {
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeCalendarEventDates(startInput, endInput, allDay) {
+  if (!allDay) {
+    return { start: startInput, end: endInput || null };
+  }
+
+  const startDate = new Date(startInput);
+  if (Number.isNaN(startDate.getTime())) return null;
+
+  const startYmd = toYmd(startDate);
+  if (!endInput) return { start: startYmd, end: null };
+
+  const endDateRaw = new Date(endInput);
+  if (Number.isNaN(endDateRaw.getTime())) return { start: startYmd, end: null };
+
+  const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const endDay = new Date(endDateRaw.getFullYear(), endDateRaw.getMonth(), endDateRaw.getDate());
+  const inclusiveEnd = endDay < startDay ? startDay : endDay;
+  const exclusiveEnd = addDays(inclusiveEnd, 1);
+
+  return { start: startYmd, end: toYmd(exclusiveEnd) };
+}
+
+function syncCalendarEventsFromInstance() {
+  if (!calendarInstance) return;
+  state.calendarEvents = calendarInstance.getEvents().map((event) => ({
+    id: event.id,
+    title: event.title,
+    start: event.startStr,
+    end: event.endStr || null,
+    allDay: event.allDay,
+    color: event.backgroundColor || event.borderColor || "#0a53d0",
+    details: event.extendedProps?.details || "",
+  }));
+  persistCalendarEvents();
+}
+
+function loadEventInForm(event) {
+  state.calendarEditingId = event.id;
+  $("calendarFormTitle").textContent = "Editar evento";
+  $("calendarEventTitle").value = event.title || "";
+  $("calendarEventDetails").value = event.extendedProps?.details || "";
+  $("calendarEventColor").value = event.backgroundColor || event.borderColor || "#0a53d0";
+  updateCalendarColorPreview($("calendarEventColor").value);
+  $("calendarEventAllDay").checked = !!event.allDay;
+
+  if (event.allDay) {
+    $("calendarEventStart").value = event.startStr ? `${event.startStr}T00:00` : "";
+    if (event.endStr) {
+      const endDate = parseYmdAsLocalDate(event.endStr);
+      $("calendarEventEnd").value = endDate ? `${toYmd(addDays(endDate, -1))}T00:00` : "";
+    } else {
+      $("calendarEventEnd").value = "";
+    }
+  } else {
+    $("calendarEventStart").value = event.start ? toLocalDateTimeValue(event.start) : "";
+    $("calendarEventEnd").value = event.end ? toLocalDateTimeValue(event.end) : "";
+  }
+
+  $("calendarDeleteBtn").classList.remove("hidden");
+  $("calendarCancelEditBtn").classList.remove("hidden");
+}
+
+function prefillCalendarFormFromSelection(info) {
+  resetCalendarForm();
+  $("calendarEventStart").value = info.start ? toLocalDateTimeValue(info.start) : "";
+  if (info.allDay && info.end) {
+    const inclusiveEnd = addDays(info.end, -1);
+    $("calendarEventEnd").value = toLocalDateTimeValue(inclusiveEnd);
+  } else {
+    $("calendarEventEnd").value = info.end ? toLocalDateTimeValue(info.end) : "";
+  }
+  $("calendarEventAllDay").checked = !!info.allDay;
+}
+
+function initCalendar() {
+  if (calendarInstance || !window.FullCalendar || !$("calendarContainer")) return;
+  calendarInstance = new FullCalendar.Calendar($("calendarContainer"), {
+    locale: "es",
+    initialView: "dayGridMonth",
+    height: "auto",
+    selectable: true,
+    editable: true,
+    headerToolbar: {
+      left: "prev,next today",
+      center: "title",
+      right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+    },
+    buttonText: {
+      today: "Hoy",
+      month: "Mes",
+      week: "Semana",
+      day: "Día",
+      list: "Agenda",
+    },
+    events: state.calendarEvents,
+    select: (info) => prefillCalendarFormFromSelection(info),
+    eventClick: (info) => loadEventInForm(info.event),
+    eventDrop: () => syncCalendarEventsFromInstance(),
+    eventResize: () => syncCalendarEventsFromInstance(),
+    eventDidMount: (info) => {
+      const details = info.event.extendedProps?.details;
+      if (details) info.el.title = details;
+    },
+  });
+  calendarInstance.render();
+}
+
+function openCalendarModal() {
+  closeAllDrawers();
+  loadCalendarEvents();
+  $("calendarModal").classList.remove("hidden");
+  resetCalendarForm();
+  initCalendar();
+  if (calendarInstance) {
+    calendarInstance.removeAllEvents();
+    calendarInstance.addEventSource(state.calendarEvents);
+    calendarInstance.updateSize();
+  }
+}
+
+function saveCalendarEvent() {
+  if (!calendarInstance) return;
+  const title = $("calendarEventTitle").value.trim();
+  const details = $("calendarEventDetails").value.trim();
+  const startInput = $("calendarEventStart").value;
+  const endInput = $("calendarEventEnd").value;
+  const color = $("calendarEventColor").value || "#0a53d0";
+  const allDay = $("calendarEventAllDay").checked;
+  if (!title || !startInput) return showToast("Completá título y fecha de inicio");
+
+  const normalizedDates = normalizeCalendarEventDates(startInput, endInput, allDay);
+  if (!normalizedDates) return showToast("Fecha inválida");
+
+  if (state.calendarEditingId) {
+    const existing = calendarInstance.getEventById(state.calendarEditingId);
+    if (!existing) return;
+    existing.setAllDay(allDay);
+    existing.setProp("title", title);
+    existing.setStart(normalizedDates.start);
+    existing.setEnd(normalizedDates.end);
+    existing.setExtendedProp("details", details);
+    existing.setProp("backgroundColor", color);
+    existing.setProp("borderColor", color);
+  } else {
+    calendarInstance.addEvent({
+      id: `ev_${Date.now()}`,
+      title,
+      start: normalizedDates.start,
+      end: normalizedDates.end,
+      allDay,
+      backgroundColor: color,
+      borderColor: color,
+      extendedProps: { details },
+    });
+  }
+
+  syncCalendarEventsFromInstance();
+  resetCalendarForm();
+  showToast("Evento guardado");
 }
 
 function showToast(msg) {
@@ -1151,6 +1375,7 @@ async function init() {
 
   loadUserThemePreference();
   applyUserPreferences();
+  loadCalendarEvents();
 
   window.addEventListener("resize", syncTopScrollbar);
 
@@ -1164,6 +1389,7 @@ async function init() {
     state.user = userFromSession;
     loadUserThemePreference(state.user);
     applyUserPreferences();
+    loadCalendarEvents();
     const rememberedStore = localStorage.getItem(`ttx_store_${state.user}`);
     if (rememberedStore) {
       await selectStore(rememberedStore);
@@ -1175,6 +1401,7 @@ async function init() {
     const lastUser = localStorage.getItem("ttx_last_user");
     loadUserThemePreference(lastUser);
     applyUserPreferences();
+    loadCalendarEvents();
     switchView("loginView");
   }
 }
@@ -1275,6 +1502,21 @@ $("workspaceCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("cat
 $("menuConverterBtn").onclick = () => { closeAllDrawers(); $("converterModal").classList.remove("hidden"); };
 $("workspaceConverterBtn").onclick = () => { closeAllDrawers(); $("converterModal").classList.remove("hidden"); };
 $("closeConverterModal").onclick = () => $("converterModal").classList.add("hidden");
+$("menuCalendarBtn").onclick = openCalendarModal;
+$("workspaceCalendarBtn").onclick = openCalendarModal;
+$("closeCalendarModal").onclick = () => $("calendarModal").classList.add("hidden");
+$("calendarSaveBtn").onclick = saveCalendarEvent;
+$("calendarEventColor").oninput = (e) => updateCalendarColorPreview(e.target.value);
+$("calendarCancelEditBtn").onclick = resetCalendarForm;
+$("calendarDeleteBtn").onclick = () => {
+  if (!calendarInstance || !state.calendarEditingId) return;
+  const event = calendarInstance.getEventById(state.calendarEditingId);
+  if (!event) return;
+  event.remove();
+  syncCalendarEventsFromInstance();
+  resetCalendarForm();
+  showToast("Evento eliminado");
+};
 $("categoriesBackBtn").onclick = () => switchView(state.currentStore ? "workspaceView" : "storeView");
 
 $("changeStoreBtn").onclick = () => { renderStoreSwitchList(); $("storeSwitchModal").classList.remove("hidden"); };
@@ -1337,6 +1579,7 @@ const doLogout = () => {
   state.user = null;
   state.currentStore = null;
   state.activeSessionId = null;
+  resetCalendarForm();
   switchView("loginView");
 };
 
