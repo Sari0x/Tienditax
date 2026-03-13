@@ -690,14 +690,6 @@ function renderSkuSuggestions(inputEl, rowIdx) {
 }
 
 
-function positionInlineAddButton() {
-  const container = $("tableContainer");
-  const addWrap = container?.querySelector(".add-row-inline-wrap");
-  if (!container || !addWrap) return;
-  const x = Math.max(12, container.scrollLeft + container.clientWidth - 72);
-  addWrap.style.left = `${x}px`;
-}
-
 function syncTopScrollbar() {
   const container = $("tableContainer");
   const topScroll = $("tableTopScroll");
@@ -708,7 +700,6 @@ function syncTopScrollbar() {
   topInner.style.width = `${fullWidth}px`;
   const showTopScroll = container.scrollWidth > container.clientWidth;
   topScroll.classList.toggle("hidden", !showTopScroll);
-  positionInlineAddButton();
 }
 
 function buildWorkspace() {
@@ -741,7 +732,7 @@ function buildWorkspace() {
       }
       return `<div class='field-block'><label>${field}${required}</label><input data-row='${idx}' data-field='${field}' value='${row[field] || ""}'></div>`;
     }).join("");
-    rowBox.innerHTML = `<button class='row-delete-btn' data-del-row='${idx}' title='Eliminar fila'><i class='bi bi-trash3'></i></button><div class='row-grid'>${fieldsHtml}</div>`;
+    rowBox.innerHTML = `<div class='row-grid'>${fieldsHtml}</div><div class='row-actions'><button class='row-delete-btn' data-del-row='${idx}' title='Eliminar fila'><i class='bi bi-trash3'></i></button><button class='add-row-inline-btn' data-add-row='${idx}' title='Agregar fila'>+</button></div>`;
     wrap.appendChild(rowBox);
   });
 
@@ -752,21 +743,15 @@ function buildWorkspace() {
   topScrollWrap.innerHTML = `<div id="tableTopScrollInner"></div>`;
   container.appendChild(topScrollWrap);
   container.appendChild(wrap);
-  const addRowWrap = document.createElement("div");
-  addRowWrap.className = "add-row-inline-wrap";
-  addRowWrap.innerHTML = `<button id="addRowInlineBtn" class="add-row-inline-btn" title="Agregar fila">+</button>`;
-  container.appendChild(addRowWrap);
 
   syncTopScrollbar();
   requestAnimationFrame(syncTopScrollbar);
   container.onscroll = () => {
     if (topScroll && topScroll.scrollLeft !== container.scrollLeft) topScroll.scrollLeft = container.scrollLeft;
-    positionInlineAddButton();
   };
   if (topScroll) {
     topScroll.onscroll = () => {
       if (container.scrollLeft !== topScroll.scrollLeft) container.scrollLeft = topScroll.scrollLeft;
-      positionInlineAddButton();
     };
   }
   requestAnimationFrame(() => {
@@ -774,7 +759,6 @@ function buildWorkspace() {
     container.scrollTop = previousScrollTop;
     if (topScroll) topScroll.scrollLeft = previousScrollLeft;
     window.scrollTo(previousWindowX, previousWindowY);
-    positionInlineAddButton();
   });
 
   container.querySelectorAll("input[data-row], select[data-row]").forEach((control) => {
@@ -830,8 +814,12 @@ function buildWorkspace() {
     }
   });
 
-  const inlineAddBtn = $("addRowInlineBtn");
-  if (inlineAddBtn) inlineAddBtn.onclick = addNewRow;
+  container.querySelectorAll("[data-add-row]").forEach((btn) => {
+    btn.onclick = () => {
+      const rowIdx = Number(btn.dataset.addRow);
+      addNewRow(rowIdx + 1);
+    };
+  });
 
   container.querySelectorAll("[data-del-row]").forEach((btn) => {
     btn.onclick = async () => {
@@ -1320,9 +1308,13 @@ window.addEventListener("keydown", async (e) => {
   }
 });
 
-function addNewRow() {
+function addNewRow(insertAt = null) {
   state.products[state.currentStore] = state.products[state.currentStore] || [defaultRow()];
-  state.products[state.currentStore].push(defaultRow());
+  if (insertAt === null || Number.isNaN(insertAt) || insertAt < 0 || insertAt > state.products[state.currentStore].length) {
+    state.products[state.currentStore].push(defaultRow());
+  } else {
+    state.products[state.currentStore].splice(insertAt, 0, defaultRow());
+  }
   buildWorkspace();
 }
 
