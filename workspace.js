@@ -270,13 +270,27 @@ function linkByValue(value) {
   return LINK_OPTIONS.find((l) => l.value === value) || LINK_OPTIONS[0];
 }
 
+function detectLinkTypeFromUrl(urlValue) {
+  const raw = String(urlValue || "").trim().toLowerCase();
+  if (!raw) return null;
+
+  if (raw.includes("meet.google.com")) return "meet";
+  if (raw.includes("teams.microsoft.com") || raw.includes("teams.live.com") || raw.includes("msteams")) return "teams";
+  if (raw.includes("zoom.us")) return "zoom";
+  return "otro";
+}
+
 function renderCompanyLogo() {
   const company = companyByValue($("eventCompany").value);
   $("eventCompanyLogo").innerHTML = `<span class="logo-badge" style="background:${company.color}" title="${company.label}">${company.short}</span><small>${company.label}</small>`;
 }
 
 function renderLinkLogo() {
-  const link = linkByValue($("eventLinkType").value);
+  const autoType = detectLinkTypeFromUrl($("eventLinkUrl").value);
+  if (autoType && $("eventLinkType").value !== autoType) {
+    $("eventLinkType").value = autoType;
+  }
+  const link = linkByValue(autoType || $("eventLinkType").value);
   $("eventLinkLogo").innerHTML = `<span class="logo-badge" style="background:${link.color}" title="${link.label}"><i class="bi ${link.icon}"></i></span><small>${link.label}</small>`;
 }
 
@@ -412,7 +426,7 @@ function eventFromForm(eventId, attachments) {
       assignees,
       company: $("eventCompany").value,
       status: $("eventStatus").value,
-      linkType: $("eventLinkType").value,
+      linkType: detectLinkTypeFromUrl($("eventLinkUrl").value) || $("eventLinkType").value,
       linkUrl: $("eventLinkUrl").value.trim(),
       attachments: attachments || [],
     },
@@ -661,6 +675,8 @@ async function init() {
 
   $("eventCompany").onchange = renderCompanyLogo;
   $("eventLinkType").onchange = renderLinkLogo;
+  $("eventLinkUrl").oninput = renderLinkLogo;
+  $("eventLinkUrl").onblur = renderLinkLogo;
   $("eventColor").oninput = (e) => updateColorPreview(e.target.value);
   $("eventAttachmentsInput").onchange = (e) => addSelectedFilesToPending(e.target.files);
   $("saveEventBtn").onclick = saveEvent;

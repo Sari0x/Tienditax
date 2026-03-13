@@ -73,7 +73,7 @@ h1 { margin: 0; font-size: 22px; }
 
 .card {
   padding: 14px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
 }
 .card h2 { margin: 0 0 10px; font-size: 18px; }
@@ -193,6 +193,11 @@ small { color: var(--muted); }
   gap: 6px;
   justify-content: flex-start;
   flex-wrap: wrap;
+  align-self: flex-end;
+}
+
+#eventLinkLogo {
+  min-height: 38px;
 }
 .logo-badge {
   width: 30px;
