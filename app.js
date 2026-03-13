@@ -18,7 +18,8 @@ const CATEGORY_STORE_OPTIONS = [
 
 const ADMIN_USER = "manusario";
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null, theme: "light" };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null, theme: "light", calendarEvents: [], calendarEditingId: null };
+let calendarInstance = null;
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
 const dbPut = async (path, data) => fetch(`${DB_URL}/${path}.json`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
@@ -60,6 +61,155 @@ function bindPreferenceSwitch(id, onChange) {
   const el = $(id);
   if (!el) return;
   el.onchange = (e) => onChange(e.target.checked);
+}
+
+function calendarStorageKey() {
+  return `ttx_calendar_events_${state.user || "guest"}`;
+}
+
+function loadCalendarEvents() {
+  try {
+    const raw = localStorage.getItem(calendarStorageKey());
+    const parsed = JSON.parse(raw || "[]");
+    state.calendarEvents = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    state.calendarEvents = [];
+  }
+}
+
+function persistCalendarEvents() {
+  localStorage.setItem(calendarStorageKey(), JSON.stringify(state.calendarEvents));
+}
+
+function resetCalendarForm() {
+  state.calendarEditingId = null;
+  $("calendarFormTitle").textContent = "Nuevo evento";
+  $("calendarEventTitle").value = "";
+  $("calendarEventDetails").value = "";
+  $("calendarEventStart").value = "";
+  $("calendarEventEnd").value = "";
+  $("calendarEventColor").value = "#0a53d0";
+  $("calendarEventAllDay").checked = false;
+  $("calendarDeleteBtn").classList.add("hidden");
+  $("calendarCancelEditBtn").classList.add("hidden");
+}
+
+function syncCalendarEventsFromInstance() {
+  if (!calendarInstance) return;
+  state.calendarEvents = calendarInstance.getEvents().map((event) => ({
+    id: event.id,
+    title: event.title,
+    start: event.startStr,
+    end: event.endStr || null,
+    allDay: event.allDay,
+    color: event.backgroundColor || event.borderColor || "#0a53d0",
+    details: event.extendedProps?.details || "",
+  }));
+  persistCalendarEvents();
+}
+
+function loadEventInForm(event) {
+  state.calendarEditingId = event.id;
+  $("calendarFormTitle").textContent = "Editar evento";
+  $("calendarEventTitle").value = event.title || "";
+  $("calendarEventDetails").value = event.extendedProps?.details || "";
+  $("calendarEventColor").value = event.backgroundColor || event.borderColor || "#0a53d0";
+  $("calendarEventAllDay").checked = !!event.allDay;
+  $("calendarEventStart").value = event.start ? new Date(event.start.getTime() - (event.start.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : "";
+  $("calendarEventEnd").value = event.end ? new Date(event.end.getTime() - (event.end.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : "";
+  $("calendarDeleteBtn").classList.remove("hidden");
+  $("calendarCancelEditBtn").classList.remove("hidden");
+}
+
+function prefillCalendarFormFromSelection(info) {
+  resetCalendarForm();
+  $("calendarEventStart").value = info.start ? new Date(info.start.getTime() - (info.start.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : "";
+  $("calendarEventEnd").value = info.end ? new Date(info.end.getTime() - (info.end.getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : "";
+  $("calendarEventAllDay").checked = !!info.allDay;
+}
+
+function initCalendar() {
+  if (calendarInstance || !window.FullCalendar || !$("calendarContainer")) return;
+  calendarInstance = new FullCalendar.Calendar($("calendarContainer"), {
+    locale: "es",
+    initialView: "dayGridMonth",
+    height: "auto",
+    selectable: true,
+    editable: true,
+    headerToolbar: {
+      left: "prev,next today",
+      center: "title",
+      right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+    },
+    buttonText: {
+      today: "Hoy",
+      month: "Mes",
+      week: "Semana",
+      day: "Día",
+      list: "Agenda",
+    },
+    events: state.calendarEvents,
+    select: (info) => prefillCalendarFormFromSelection(info),
+    eventClick: (info) => loadEventInForm(info.event),
+    eventDrop: () => syncCalendarEventsFromInstance(),
+    eventResize: () => syncCalendarEventsFromInstance(),
+    eventDidMount: (info) => {
+      const details = info.event.extendedProps?.details;
+      if (details) info.el.title = details;
+    },
+  });
+  calendarInstance.render();
+}
+
+function openCalendarModal() {
+  closeAllDrawers();
+  loadCalendarEvents();
+  $("calendarModal").classList.remove("hidden");
+  resetCalendarForm();
+  initCalendar();
+  if (calendarInstance) {
+    calendarInstance.removeAllEvents();
+    calendarInstance.addEventSource(state.calendarEvents);
+    calendarInstance.updateSize();
+  }
+}
+
+function saveCalendarEvent() {
+  if (!calendarInstance) return;
+  const title = $("calendarEventTitle").value.trim();
+  const details = $("calendarEventDetails").value.trim();
+  const start = $("calendarEventStart").value;
+  const end = $("calendarEventEnd").value;
+  const color = $("calendarEventColor").value || "#0a53d0";
+  const allDay = $("calendarEventAllDay").checked;
+  if (!title || !start) return showToast("Completá título y fecha de inicio");
+
+  if (state.calendarEditingId) {
+    const existing = calendarInstance.getEventById(state.calendarEditingId);
+    if (!existing) return;
+    existing.setProp("title", title);
+    existing.setStart(start);
+    existing.setEnd(end || null);
+    existing.setAllDay(allDay);
+    existing.setExtendedProp("details", details);
+    existing.setProp("backgroundColor", color);
+    existing.setProp("borderColor", color);
+  } else {
+    calendarInstance.addEvent({
+      id: `ev_${Date.now()}`,
+      title,
+      start,
+      end: end || null,
+      allDay,
+      backgroundColor: color,
+      borderColor: color,
+      extendedProps: { details },
+    });
+  }
+
+  syncCalendarEventsFromInstance();
+  resetCalendarForm();
+  showToast("Evento guardado");
 }
 
 function showToast(msg) {
@@ -1151,6 +1301,7 @@ async function init() {
 
   loadUserThemePreference();
   applyUserPreferences();
+  loadCalendarEvents();
 
   window.addEventListener("resize", syncTopScrollbar);
 
@@ -1164,6 +1315,7 @@ async function init() {
     state.user = userFromSession;
     loadUserThemePreference(state.user);
     applyUserPreferences();
+    loadCalendarEvents();
     const rememberedStore = localStorage.getItem(`ttx_store_${state.user}`);
     if (rememberedStore) {
       await selectStore(rememberedStore);
@@ -1175,6 +1327,7 @@ async function init() {
     const lastUser = localStorage.getItem("ttx_last_user");
     loadUserThemePreference(lastUser);
     applyUserPreferences();
+    loadCalendarEvents();
     switchView("loginView");
   }
 }
@@ -1275,6 +1428,20 @@ $("workspaceCategoriesBtn").onclick = () => { closeAllDrawers(); switchView("cat
 $("menuConverterBtn").onclick = () => { closeAllDrawers(); $("converterModal").classList.remove("hidden"); };
 $("workspaceConverterBtn").onclick = () => { closeAllDrawers(); $("converterModal").classList.remove("hidden"); };
 $("closeConverterModal").onclick = () => $("converterModal").classList.add("hidden");
+$("menuCalendarBtn").onclick = openCalendarModal;
+$("workspaceCalendarBtn").onclick = openCalendarModal;
+$("closeCalendarModal").onclick = () => $("calendarModal").classList.add("hidden");
+$("calendarSaveBtn").onclick = saveCalendarEvent;
+$("calendarCancelEditBtn").onclick = resetCalendarForm;
+$("calendarDeleteBtn").onclick = () => {
+  if (!calendarInstance || !state.calendarEditingId) return;
+  const event = calendarInstance.getEventById(state.calendarEditingId);
+  if (!event) return;
+  event.remove();
+  syncCalendarEventsFromInstance();
+  resetCalendarForm();
+  showToast("Evento eliminado");
+};
 $("categoriesBackBtn").onclick = () => switchView(state.currentStore ? "workspaceView" : "storeView");
 
 $("changeStoreBtn").onclick = () => { renderStoreSwitchList(); $("storeSwitchModal").classList.remove("hidden"); };
@@ -1337,6 +1504,7 @@ const doLogout = () => {
   state.user = null;
   state.currentStore = null;
   state.activeSessionId = null;
+  resetCalendarForm();
   switchView("loginView");
 };
 
