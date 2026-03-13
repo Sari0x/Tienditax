@@ -1,5 +1,8 @@
 const $ = (id) => document.getElementById(id);
 
+const FIREBASE_DB_URL = "https://tienditax-default-rtdb.firebaseio.com";
+const FIREBASE_STORAGE_BUCKET = "tienditax.appspot.com";
+
 const COMPANY_OPTIONS = [
   { value: "napse", label: "Napse", short: "N", color: "#0ea5e9" },
   { value: "cygnus", label: "Cygnus", short: "C", color: "#14b8a6" },
@@ -24,16 +27,73 @@ const state = {
   events: [],
   editingId: null,
   calendar: null,
+  pendingFiles: [],
+  existingAttachments: [],
 };
 
+function currentUser() {
+  return localStorage.getItem("ttx_user") || "guest";
+}
+
+function sanitizePathPart(value) {
+  return String(value || "").replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function dbPath(path) {
+  return `${FIREBASE_DB_URL}/${path}.json`;
+}
+
+async function dbGet(path) {
+  return (await fetch(dbPath(path))).json();
+}
+
+async function dbPut(path, data) {
+  return fetch(dbPath(path), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+async function uploadFileToFirebaseStorage(file, eventId) {
+  const user = sanitizePathPart(currentUser());
+  const safeName = sanitizePathPart(file.name);
+  const objectPath = `workspace/${user}/${eventId}/${Date.now()}_${safeName}`;
+  const url = `https://firebasestorage.googleapis.com/v0/b/${FIREBASE_STORAGE_BUCKET}/o?name=${encodeURIComponent(objectPath)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+      "X-Goog-Upload-Protocol": "raw",
+    },
+    body: file,
+  });
+
+  if (!res.ok) throw new Error(`No se pudo subir ${file.name}`);
+  const uploaded = await res.json();
+
+  const encodedName = encodeURIComponent(uploaded.name || objectPath);
+  const mediaUrl = uploaded.downloadTokens
+    ? `https://firebasestorage.googleapis.com/v0/b/${FIREBASE_STORAGE_BUCKET}/o/${encodedName}?alt=media&token=${uploaded.downloadTokens}`
+    : `https://firebasestorage.googleapis.com/v0/b/${FIREBASE_STORAGE_BUCKET}/o/${encodedName}?alt=media`;
+
+  return {
+    name: file.name,
+    type: file.type || "application/octet-stream",
+    size: file.size || 0,
+    objectPath: uploaded.name || objectPath,
+    downloadUrl: mediaUrl,
+    uploadedAt: new Date().toISOString(),
+  };
+}
+
 function storageKeyProfiles() {
-  const user = localStorage.getItem("ttx_user") || "guest";
-  return `ttx_workspace_profiles_${user}`;
+  return `ttx_workspace_profiles_${currentUser()}`;
 }
 
 function storageKeyEvents() {
-  const user = localStorage.getItem("ttx_user") || "guest";
-  return `ttx_workspace_events_${user}`;
+  return `ttx_workspace_events_${currentUser()}`;
 }
 
 function randomAvatarColor() {
@@ -45,22 +105,38 @@ function initials(name, lastName) {
   return `${(name || "")[0] || ""}${(lastName || "")[0] || ""}`.toUpperCase() || "NA";
 }
 
-function loadData() {
+function normalizeEventArray(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  return Object.values(raw).filter(Boolean);
+}
+
+async function loadData() {
   try {
+    const [profilesRemote, eventsRemote] = await Promise.all([
+      dbGet(`workspace_profiles/${currentUser()}`),
+      dbGet(`workspace_events/${currentUser()}`),
+    ]);
+
+    state.profiles = normalizeEventArray(profilesRemote);
+    state.events = normalizeEventArray(eventsRemote);
+
+    localStorage.setItem(storageKeyProfiles(), JSON.stringify(state.profiles));
+    localStorage.setItem(storageKeyEvents(), JSON.stringify(state.events));
+  } catch {
     state.profiles = JSON.parse(localStorage.getItem(storageKeyProfiles()) || "[]");
     state.events = JSON.parse(localStorage.getItem(storageKeyEvents()) || "[]");
-  } catch {
-    state.profiles = [];
-    state.events = [];
   }
 }
 
-function saveProfiles() {
+async function saveProfiles() {
   localStorage.setItem(storageKeyProfiles(), JSON.stringify(state.profiles));
+  await dbPut(`workspace_profiles/${currentUser()}`, state.profiles);
 }
 
-function saveEvents() {
+async function saveEvents() {
   localStorage.setItem(storageKeyEvents(), JSON.stringify(state.events));
+  await dbPut(`workspace_events/${currentUser()}`, state.events);
 }
 
 function setDarkModeFromAppPreference() {
@@ -103,9 +179,9 @@ function renderProfiles() {
       </div>
       <button class="btn danger" data-id="${profile.id}"><i class="bi bi-trash3"></i></button>
     `;
-    row.querySelector("button").onclick = () => {
+    row.querySelector("button").onclick = async () => {
       state.profiles = state.profiles.filter((p) => p.id !== profile.id);
-      saveProfiles();
+      await saveProfiles();
       renderProfiles();
       renderAssigneesSelect();
     };
@@ -165,7 +241,83 @@ function normalizeDates(startInput, endInput, allDay) {
   return { start, end: endExclusive };
 }
 
-function eventFromForm() {
+function renderAttachmentList() {
+  const box = $("eventAttachmentsList");
+  const pendingRows = state.pendingFiles.map((file, index) => ({
+    kind: "pending",
+    key: `pending-${index}`,
+    name: file.name,
+    size: file.size,
+  }));
+  const existingRows = (state.existingAttachments || []).map((item, index) => ({
+    kind: "existing",
+    key: `existing-${index}`,
+    name: item.name,
+    size: item.size,
+    url: item.downloadUrl,
+  }));
+  const rows = [...existingRows, ...pendingRows];
+
+  if (!rows.length) {
+    box.innerHTML = "<small>Sin archivos adjuntos.</small>";
+    return;
+  }
+
+  box.innerHTML = "";
+  rows.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "attachment-item";
+    const sizeLabel = item.size ? `${Math.max(1, Math.round(item.size / 1024))} KB` : "";
+    row.innerHTML = `
+      <div class="attachment-meta">
+        <strong>${item.name}</strong>
+        <small>${item.kind === "pending" ? "Pendiente de subida" : "Ya guardado en Firebase"}${sizeLabel ? ` · ${sizeLabel}` : ""}</small>
+      </div>
+      <div class="attachment-actions"></div>
+    `;
+
+    const actions = row.querySelector(".attachment-actions");
+    if (item.url) {
+      const openBtn = document.createElement("a");
+      openBtn.href = item.url;
+      openBtn.target = "_blank";
+      openBtn.rel = "noopener noreferrer";
+      openBtn.className = "btn ghost attachment-open";
+      openBtn.textContent = "Abrir";
+      actions.appendChild(openBtn);
+    }
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "btn danger";
+    removeBtn.textContent = "Quitar";
+    removeBtn.onclick = () => {
+      if (item.kind === "pending") {
+        const idx = Number(item.key.split("-")[1]);
+        state.pendingFiles.splice(idx, 1);
+      } else {
+        const idx = Number(item.key.split("-")[1]);
+        state.existingAttachments.splice(idx, 1);
+      }
+      renderAttachmentList();
+    };
+    actions.appendChild(removeBtn);
+
+    box.appendChild(row);
+  });
+}
+
+function addSelectedFilesToPending(files) {
+  const incoming = Array.from(files || []);
+  if (!incoming.length) return;
+  const known = new Set(state.pendingFiles.map((f) => `${f.name}-${f.size}`));
+  incoming.forEach((file) => {
+    const key = `${file.name}-${file.size}`;
+    if (!known.has(key)) state.pendingFiles.push(file);
+  });
+  renderAttachmentList();
+}
+
+function eventFromForm(eventId, attachments) {
   const title = $("eventTitle").value.trim();
   const startInput = $("eventStart").value;
   if (!title || !startInput) return null;
@@ -173,8 +325,9 @@ function eventFromForm() {
   const normalized = normalizeDates(startInput, $("eventEnd").value, allDay);
   if (!normalized) return null;
   const assignees = Array.from($("eventAssignees").selectedOptions).map((opt) => opt.value);
+
   return {
-    id: state.editingId || `ws_${Date.now()}`,
+    id: eventId,
     title,
     start: normalized.start,
     end: normalized.end,
@@ -188,11 +341,12 @@ function eventFromForm() {
       status: $("eventStatus").value,
       linkType: $("eventLinkType").value,
       linkUrl: $("eventLinkUrl").value.trim(),
+      attachments: attachments || [],
     },
   };
 }
 
-function syncEventsFromCalendar() {
+async function syncEventsFromCalendar() {
   state.events = state.calendar.getEvents().map((ev) => ({
     id: ev.id,
     title: ev.title,
@@ -208,13 +362,17 @@ function syncEventsFromCalendar() {
       status: ev.extendedProps?.status || "sin_estado",
       linkType: ev.extendedProps?.linkType || "otro",
       linkUrl: ev.extendedProps?.linkUrl || "",
+      attachments: ev.extendedProps?.attachments || [],
     },
   }));
-  saveEvents();
+  await saveEvents();
 }
 
 function resetEventForm() {
   state.editingId = null;
+  state.pendingFiles = [];
+  state.existingAttachments = [];
+  $("eventAttachmentsInput").value = "";
   $("eventFormTitle").textContent = "Nuevo evento/proyecto";
   $("eventTitle").value = "";
   $("eventDetails").value = "";
@@ -230,12 +388,17 @@ function resetEventForm() {
   Array.from($("eventAssignees").options).forEach((opt) => { opt.selected = false; });
   renderCompanyLogo();
   renderLinkLogo();
+  renderAttachmentList();
   $("deleteEventBtn").classList.add("hidden");
   $("cancelEditEventBtn").classList.add("hidden");
 }
 
 function loadEventToForm(ev) {
   state.editingId = ev.id;
+  state.pendingFiles = [];
+  state.existingAttachments = [...(ev.extendedProps?.attachments || [])];
+  $("eventAttachmentsInput").value = "";
+
   $("eventFormTitle").textContent = "Editar evento/proyecto";
   $("eventTitle").value = ev.title;
   $("eventDetails").value = ev.extendedProps?.details || "";
@@ -248,6 +411,7 @@ function loadEventToForm(ev) {
   $("eventLinkUrl").value = ev.extendedProps?.linkUrl || "";
   renderCompanyLogo();
   renderLinkLogo();
+  renderAttachmentList();
 
   if (ev.allDay) {
     $("eventStart").value = ev.startStr ? `${ev.startStr}T00:00` : "";
@@ -269,11 +433,12 @@ function loadEventToForm(ev) {
   $("cancelEditEventBtn").classList.remove("hidden");
 }
 
-function createProfile() {
+async function createProfile() {
   const name = $("profileName").value.trim();
   const lastName = $("profileLastName").value.trim();
   const mail = $("profileMail").value.trim();
   if (!name || !lastName || !mail) return;
+
   const profile = {
     id: `pf_${Date.now()}`,
     name,
@@ -282,8 +447,9 @@ function createProfile() {
     avatarText: initials(name, lastName),
     avatarColor: randomAvatarColor(),
   };
+
   state.profiles.push(profile);
-  saveProfiles();
+  await saveProfiles();
   renderProfiles();
   renderAssigneesSelect();
   $("profileName").value = "";
@@ -291,9 +457,23 @@ function createProfile() {
   $("profileMail").value = "";
 }
 
-function buildEventTitle(ev) {
-  const status = STATUS_MAP[ev.extendedProps?.status || "sin_estado"];
-  return `${ev.title} · ${status.label}`;
+function buildTooltip(event) {
+  const ext = event.extendedProps || {};
+  const assignees = (ext.assignees || [])
+    .map((id) => state.profiles.find((p) => p.id === id))
+    .filter(Boolean)
+    .map((p) => `${p.name} ${p.lastName}`)
+    .join(", ");
+
+  return [
+    event.title,
+    ext.details || "",
+    `Empresa: ${companyByValue(ext.company || "napse").label}`,
+    `Estado: ${STATUS_MAP[ext.status || "sin_estado"].label}`,
+    assignees ? `Asignados: ${assignees}` : "",
+    ext.linkUrl ? `Link: ${ext.linkUrl}` : "",
+    ext.attachments?.length ? `Adjuntos: ${ext.attachments.length}` : "",
+  ].filter(Boolean).join("\n");
 }
 
 function initCalendar() {
@@ -321,79 +501,82 @@ function initCalendar() {
       $("eventAllDay").checked = !!info.allDay;
     },
     eventClick: (info) => loadEventToForm(info.event),
-    eventDrop: () => syncEventsFromCalendar(),
-    eventResize: () => syncEventsFromCalendar(),
+    eventDrop: async () => { await syncEventsFromCalendar(); },
+    eventResize: async () => { await syncEventsFromCalendar(); },
     eventContent: (arg) => {
       const ext = arg.event.extendedProps || {};
       const company = companyByValue(ext.company || "napse");
       const status = STATUS_MAP[ext.status || "sin_estado"];
+      const attachmentMark = ext.attachments?.length ? "📎" : "";
       const wrap = document.createElement("div");
       wrap.innerHTML = `<div style="display:flex;align-items:center;gap:5px;min-width:0;">
         <span class="logo-badge" style="background:${company.color};width:18px;height:18px;border-radius:6px;font-size:9px">${company.short}</span>
-        <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${arg.event.title}</span>
+        <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${arg.event.title} ${attachmentMark}</span>
       </div>
       <span class="status-pill" style="background:${status.color}">${status.label}</span>`;
       return { domNodes: [wrap] };
     },
     eventDidMount: (arg) => {
-      const ext = arg.event.extendedProps || {};
-      const assignees = (ext.assignees || [])
-        .map((id) => state.profiles.find((p) => p.id === id))
-        .filter(Boolean)
-        .map((p) => `${p.name} ${p.lastName}`)
-        .join(", ");
-      arg.el.title = [
-        arg.event.title,
-        ext.details || "",
-        `Empresa: ${companyByValue(ext.company || "napse").label}`,
-        `Estado: ${STATUS_MAP[ext.status || "sin_estado"].label}`,
-        assignees ? `Asignados: ${assignees}` : "",
-        ext.linkUrl ? `Link: ${ext.linkUrl}` : "",
-      ].filter(Boolean).join("\n");
+      arg.el.title = buildTooltip(arg.event);
     },
   });
   state.calendar.render();
 }
 
-function saveEvent() {
-  const payload = eventFromForm();
-  if (!payload || !state.calendar) return;
+async function saveEvent() {
+  if (!state.calendar) return;
 
-  if (state.editingId) {
-    const ev = state.calendar.getEventById(state.editingId);
-    if (!ev) return;
-    ev.setAllDay(payload.allDay);
-    ev.setProp("title", payload.title);
-    ev.setStart(payload.start);
-    ev.setEnd(payload.end);
-    ev.setProp("backgroundColor", payload.backgroundColor);
-    ev.setProp("borderColor", payload.borderColor);
-    ev.setExtendedProp("details", payload.extendedProps.details);
-    ev.setExtendedProp("assignees", payload.extendedProps.assignees);
-    ev.setExtendedProp("company", payload.extendedProps.company);
-    ev.setExtendedProp("status", payload.extendedProps.status);
-    ev.setExtendedProp("linkType", payload.extendedProps.linkType);
-    ev.setExtendedProp("linkUrl", payload.extendedProps.linkUrl);
-  } else {
-    state.calendar.addEvent(payload);
+  const eventId = state.editingId || `ws_${Date.now()}`;
+  $("saveEventBtn").disabled = true;
+  $("saveEventBtn").textContent = "Guardando...";
+
+  try {
+    const uploadedAttachments = [];
+    for (const file of state.pendingFiles) {
+      const uploaded = await uploadFileToFirebaseStorage(file, eventId);
+      uploadedAttachments.push(uploaded);
+    }
+
+    const allAttachments = [...state.existingAttachments, ...uploadedAttachments];
+    const payload = eventFromForm(eventId, allAttachments);
+    if (!payload) throw new Error("Completá título y fecha de inicio");
+
+    if (state.editingId) {
+      const ev = state.calendar.getEventById(state.editingId);
+      if (!ev) throw new Error("No se encontró el evento a editar");
+      ev.setAllDay(payload.allDay);
+      ev.setProp("title", payload.title);
+      ev.setStart(payload.start);
+      ev.setEnd(payload.end);
+      ev.setProp("backgroundColor", payload.backgroundColor);
+      ev.setProp("borderColor", payload.borderColor);
+      Object.entries(payload.extendedProps).forEach(([key, value]) => ev.setExtendedProp(key, value));
+    } else {
+      state.calendar.addEvent(payload);
+    }
+
+    await syncEventsFromCalendar();
+    resetEventForm();
+  } catch (err) {
+    window.alert(err.message || "No se pudo guardar el evento");
+  } finally {
+    $("saveEventBtn").disabled = false;
+    $("saveEventBtn").textContent = "Guardar";
   }
-
-  syncEventsFromCalendar();
-  resetEventForm();
 }
 
-function deleteEvent() {
+async function deleteEvent() {
   if (!state.editingId || !state.calendar) return;
   const ev = state.calendar.getEventById(state.editingId);
   if (!ev) return;
   ev.remove();
-  syncEventsFromCalendar();
+  await syncEventsFromCalendar();
   resetEventForm();
 }
 
-function init() {
+async function init() {
   setDarkModeFromAppPreference();
-  loadData();
+  await loadData();
   renderCompanyOptions();
   renderLinkTypeOptions();
   renderProfiles();
@@ -404,6 +587,7 @@ function init() {
   $("eventCompany").onchange = renderCompanyLogo;
   $("eventLinkType").onchange = renderLinkLogo;
   $("eventColor").oninput = (e) => updateColorPreview(e.target.value);
+  $("eventAttachmentsInput").onchange = (e) => addSelectedFilesToPending(e.target.files);
   $("saveEventBtn").onclick = saveEvent;
   $("deleteEventBtn").onclick = deleteEvent;
   $("cancelEditEventBtn").onclick = resetEventForm;
