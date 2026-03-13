@@ -1504,6 +1504,8 @@ $("workspaceConverterBtn").onclick = () => { closeAllDrawers(); $("converterModa
 $("closeConverterModal").onclick = () => $("converterModal").classList.add("hidden");
 $("menuCalendarBtn").onclick = openCalendarModal;
 $("workspaceCalendarBtn").onclick = openCalendarModal;
+if ($("menuWorkspacePageBtn")) $("menuWorkspacePageBtn").onclick = () => { closeAllDrawers(); window.location.href = "workspace.html"; };
+if ($("workspaceWorkspacePageBtn")) $("workspaceWorkspacePageBtn").onclick = () => { closeAllDrawers(); window.location.href = "workspace.html"; };
 $("closeCalendarModal").onclick = () => $("calendarModal").classList.add("hidden");
 $("calendarSaveBtn").onclick = saveCalendarEvent;
 $("calendarEventColor").oninput = (e) => updateCalendarColorPreview(e.target.value);
