@@ -280,7 +280,7 @@ function detectLinkTypeFromUrl(urlValue) {
   return "otro";
 }
 
-function companyLogoHtml(company, size = 26) {
+function companyLogoHtml(company, size = 74) {
   if (company.logo) {
     return `<img src="${company.logo}" alt="${company.label}" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:6px;background:#fff;padding:1px;" />`;
   }
