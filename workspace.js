@@ -31,6 +31,11 @@ const state = {
   existingAttachments: [],
 };
 
+const syncMeta = {
+  profiles: { pending: false, lastError: null },
+  events: { pending: false, lastError: null },
+};
+
 function currentUser() {
   return localStorage.getItem("ttx_user") || "guest";
 }
@@ -111,32 +116,100 @@ function normalizeEventArray(raw) {
   return Object.values(raw).filter(Boolean);
 }
 
+function withUpdatedAt(item) {
+  return {
+    ...item,
+    updatedAt: item.updatedAt || new Date().toISOString(),
+  };
+}
+
+function normalizeProfiles(raw) {
+  return normalizeEventArray(raw).map((profile) => withUpdatedAt(profile));
+}
+
+function normalizeEvents(raw) {
+  return normalizeEventArray(raw).map((event) => withUpdatedAt(event));
+}
+
+function mergeByNewest(remoteItems, localItems) {
+  const map = new Map();
+  [...(localItems || []), ...(remoteItems || [])].forEach((item) => {
+    if (!item?.id) return;
+    const current = map.get(item.id);
+    if (!current) {
+      map.set(item.id, item);
+      return;
+    }
+    const currentTs = Date.parse(current.updatedAt || 0) || 0;
+    const incomingTs = Date.parse(item.updatedAt || 0) || 0;
+    if (incomingTs >= currentTs) map.set(item.id, item);
+  });
+  return [...map.values()];
+}
+
+function readLocalArray(key, normalizer) {
+  try {
+    return normalizer(JSON.parse(localStorage.getItem(key) || "[]"));
+  } catch {
+    return [];
+  }
+}
+
 async function loadData() {
+  const localProfiles = readLocalArray(storageKeyProfiles(), normalizeProfiles);
+  const localEvents = readLocalArray(storageKeyEvents(), normalizeEvents);
+
   try {
     const [profilesRemote, eventsRemote] = await Promise.all([
       dbGet(`workspace_profiles/${currentUser()}`),
       dbGet(`workspace_events/${currentUser()}`),
     ]);
 
-    state.profiles = normalizeEventArray(profilesRemote);
-    state.events = normalizeEventArray(eventsRemote);
+    const remoteProfiles = normalizeProfiles(profilesRemote);
+    const remoteEvents = normalizeEvents(eventsRemote);
+
+    state.profiles = mergeByNewest(remoteProfiles, localProfiles);
+    state.events = mergeByNewest(remoteEvents, localEvents);
 
     localStorage.setItem(storageKeyProfiles(), JSON.stringify(state.profiles));
     localStorage.setItem(storageKeyEvents(), JSON.stringify(state.events));
   } catch {
-    state.profiles = JSON.parse(localStorage.getItem(storageKeyProfiles()) || "[]");
-    state.events = JSON.parse(localStorage.getItem(storageKeyEvents()) || "[]");
+    state.profiles = localProfiles;
+    state.events = localEvents;
   }
 }
 
 async function saveProfiles() {
+  state.profiles = state.profiles.map((profile) => withUpdatedAt(profile));
   localStorage.setItem(storageKeyProfiles(), JSON.stringify(state.profiles));
-  await dbPut(`workspace_profiles/${currentUser()}`, state.profiles);
+  try {
+    const res = await dbPut(`workspace_profiles/${currentUser()}`, state.profiles);
+    if (!res.ok) throw new Error("Error guardando perfiles");
+    syncMeta.profiles.pending = false;
+    syncMeta.profiles.lastError = null;
+  } catch (error) {
+    syncMeta.profiles.pending = true;
+    syncMeta.profiles.lastError = error;
+  }
 }
 
 async function saveEvents() {
+  state.events = state.events.map((event) => withUpdatedAt(event));
   localStorage.setItem(storageKeyEvents(), JSON.stringify(state.events));
-  await dbPut(`workspace_events/${currentUser()}`, state.events);
+  try {
+    const res = await dbPut(`workspace_events/${currentUser()}`, state.events);
+    if (!res.ok) throw new Error("Error guardando eventos");
+    syncMeta.events.pending = false;
+    syncMeta.events.lastError = null;
+  } catch (error) {
+    syncMeta.events.pending = true;
+    syncMeta.events.lastError = error;
+  }
+}
+
+async function flushPendingSync() {
+  if (syncMeta.profiles.pending) await saveProfiles();
+  if (syncMeta.events.pending) await saveEvents();
 }
 
 function setDarkModeFromAppPreference() {
@@ -197,13 +270,27 @@ function linkByValue(value) {
   return LINK_OPTIONS.find((l) => l.value === value) || LINK_OPTIONS[0];
 }
 
+function detectLinkTypeFromUrl(urlValue) {
+  const raw = String(urlValue || "").trim().toLowerCase();
+  if (!raw) return null;
+
+  if (raw.includes("meet.google.com")) return "meet";
+  if (raw.includes("teams.microsoft.com") || raw.includes("teams.live.com") || raw.includes("msteams")) return "teams";
+  if (raw.includes("zoom.us")) return "zoom";
+  return "otro";
+}
+
 function renderCompanyLogo() {
   const company = companyByValue($("eventCompany").value);
   $("eventCompanyLogo").innerHTML = `<span class="logo-badge" style="background:${company.color}" title="${company.label}">${company.short}</span><small>${company.label}</small>`;
 }
 
 function renderLinkLogo() {
-  const link = linkByValue($("eventLinkType").value);
+  const autoType = detectLinkTypeFromUrl($("eventLinkUrl").value);
+  if (autoType && $("eventLinkType").value !== autoType) {
+    $("eventLinkType").value = autoType;
+  }
+  const link = linkByValue(autoType || $("eventLinkType").value);
   $("eventLinkLogo").innerHTML = `<span class="logo-badge" style="background:${link.color}" title="${link.label}"><i class="bi ${link.icon}"></i></span><small>${link.label}</small>`;
 }
 
@@ -339,7 +426,7 @@ function eventFromForm(eventId, attachments) {
       assignees,
       company: $("eventCompany").value,
       status: $("eventStatus").value,
-      linkType: $("eventLinkType").value,
+      linkType: detectLinkTypeFromUrl($("eventLinkUrl").value) || $("eventLinkType").value,
       linkUrl: $("eventLinkUrl").value.trim(),
       attachments: attachments || [],
     },
@@ -364,6 +451,7 @@ async function syncEventsFromCalendar() {
       linkUrl: ev.extendedProps?.linkUrl || "",
       attachments: ev.extendedProps?.attachments || [],
     },
+    updatedAt: new Date().toISOString(),
   }));
   await saveEvents();
 }
@@ -446,6 +534,7 @@ async function createProfile() {
     mail,
     avatarText: initials(name, lastName),
     avatarColor: randomAvatarColor(),
+    updatedAt: new Date().toISOString(),
   };
 
   state.profiles.push(profile);
@@ -586,6 +675,8 @@ async function init() {
 
   $("eventCompany").onchange = renderCompanyLogo;
   $("eventLinkType").onchange = renderLinkLogo;
+  $("eventLinkUrl").oninput = renderLinkLogo;
+  $("eventLinkUrl").onblur = renderLinkLogo;
   $("eventColor").oninput = (e) => updateColorPreview(e.target.value);
   $("eventAttachmentsInput").onchange = (e) => addSelectedFilesToPending(e.target.files);
   $("saveEventBtn").onclick = saveEvent;
@@ -593,6 +684,7 @@ async function init() {
   $("cancelEditEventBtn").onclick = resetEventForm;
   $("createProfileBtn").onclick = createProfile;
   $("backAppBtn").onclick = () => { window.location.href = "index.html"; };
+  window.addEventListener("online", flushPendingSync);
 }
 
 init();
