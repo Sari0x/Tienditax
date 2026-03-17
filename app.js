@@ -85,16 +85,20 @@ function tariffsStorageKey() {
   return `ttx_tariffs_rows_${state.user || "guest"}`;
 }
 
+function defaultTariffRow() {
+  return { storeName: "", commission: "", recoveryRate: "", iva: 21, final: "", logo: "", locked: false };
+}
+
 function loadTariffsRows() {
   try {
     const raw = localStorage.getItem(tariffsStorageKey());
     const parsed = JSON.parse(raw || "[]");
-    state.tariffsRows = Array.isArray(parsed) ? parsed : [];
+    state.tariffsRows = Array.isArray(parsed) ? parsed.map((row) => ({ ...defaultTariffRow(), ...(row || {}) })) : [];
   } catch {
     state.tariffsRows = [];
   }
   if (!state.tariffsRows.length) {
-    state.tariffsRows = [{ storeName: "", commission: "", recoveryRate: "", iva: 21, final: "" }];
+    state.tariffsRows = [defaultTariffRow()];
   }
 }
 
@@ -130,6 +134,11 @@ function updateTariffRowFinal(rowIndex) {
   if (finalInput) finalInput.value = row.final ? `${row.final}%` : "";
 }
 
+function hasTariffData(row) {
+  if (!row) return false;
+  return [row.storeName, row.commission, row.recoveryRate].some((value) => String(value || "").trim());
+}
+
 function renderTariffsTable() {
   const tbody = $("tariffsTableBody");
   if (!tbody) return;
@@ -137,14 +146,27 @@ function renderTariffsTable() {
 
   state.tariffsRows.forEach((row, index) => {
     row.final = computeTariffFinal(row.commission, row.recoveryRate, 0.21);
+    const locked = !!row.locked;
+    const logoPreview = row.logo ? `<img src="${row.logo}" alt="${row.storeName || "Tienda"}" class="tariff-store-logo" />` : "";
+    const storeDisplay = `<div class="tariff-store-display">${logoPreview}<span>${row.storeName || "-"}</span></div>`;
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><input type="text" data-tariff-row="${index}" data-tariff-field="storeName" placeholder="Ej: Tienda BNA" value="${row.storeName || ""}" /></td>
-      <td><input type="text" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" /></td>
-      <td><input type="text" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" /></td>
+      <td>
+        ${locked ? storeDisplay : `<div class="tariff-store-editor"><input type="text" data-tariff-row="${index}" data-tariff-field="storeName" placeholder="Ej: Tienda BNA" value="${row.storeName || ""}" />
+        <label class="tariff-logo-upload" title="Adjuntar logo"><input type="file" accept="image/*" data-tariff-logo-row="${index}" /><i class="bi bi-image"></i></label>
+        ${logoPreview}</div>`}
+      </td>
+      <td><input type="text" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" ${locked ? "readonly" : ""} /></td>
+      <td><input type="text" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" ${locked ? "readonly" : ""} /></td>
       <td><input type="text" value="21%" class="locked" readonly /></td>
       <td><input type="text" data-tariff-final-row="${index}" value="${row.final ? `${row.final}%` : ""}" class="locked" readonly /></td>
-      <td><button class="icon-action danger" type="button" data-del-tariff-row="${index}" aria-label="Eliminar fila">✕</button></td>
+      <td>
+        <div class="tariff-row-actions">
+          <button class="icon-action ${locked ? "" : "hidden"}" type="button" data-edit-tariff-row="${index}" aria-label="Editar fila"><i class="bi bi-pencil"></i></button>
+          <button class="icon-action ${locked ? "hidden" : ""}" type="button" data-lock-tariff-row="${index}" aria-label="Confirmar fila"><i class="bi bi-check-lg"></i></button>
+          <button class="icon-action danger" type="button" data-del-tariff-row="${index}" aria-label="Eliminar fila">✕</button>
+        </div>
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -154,9 +176,47 @@ function renderTariffsTable() {
       const rowIndex = Number(e.target.dataset.tariffRow);
       const field = e.target.dataset.tariffField;
       if (!state.tariffsRows[rowIndex]) return;
+      if (state.tariffsRows[rowIndex].locked) return;
       state.tariffsRows[rowIndex][field] = e.target.value;
       updateTariffRowFinal(rowIndex);
       persistTariffsRows();
+    };
+  });
+
+  tbody.querySelectorAll("input[data-tariff-logo-row]").forEach((input) => {
+    input.onchange = (e) => {
+      const rowIndex = Number(e.target.dataset.tariffLogoRow);
+      const file = e.target.files?.[0];
+      if (!file || !state.tariffsRows[rowIndex]) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.tariffsRows[rowIndex].logo = String(reader.result || "");
+        persistTariffsRows();
+        renderTariffsTable();
+      };
+      reader.readAsDataURL(file);
+    };
+  });
+
+  tbody.querySelectorAll("[data-lock-tariff-row]").forEach((btn) => {
+    btn.onclick = () => {
+      const rowIndex = Number(btn.dataset.lockTariffRow);
+      const row = state.tariffsRows[rowIndex];
+      if (!row || !hasTariffData(row)) return showToast("Completá al menos un dato antes de confirmar la fila");
+      row.locked = true;
+      updateTariffRowFinal(rowIndex);
+      persistTariffsRows();
+      renderTariffsTable();
+    };
+  });
+
+  tbody.querySelectorAll("[data-edit-tariff-row]").forEach((btn) => {
+    btn.onclick = () => {
+      const rowIndex = Number(btn.dataset.editTariffRow);
+      if (!state.tariffsRows[rowIndex]) return;
+      state.tariffsRows[rowIndex].locked = false;
+      persistTariffsRows();
+      renderTariffsTable();
     };
   });
 
@@ -165,7 +225,7 @@ function renderTariffsTable() {
       const rowIndex = Number(btn.dataset.delTariffRow);
       state.tariffsRows.splice(rowIndex, 1);
       if (!state.tariffsRows.length) {
-        state.tariffsRows.push({ storeName: "", commission: "", recoveryRate: "", iva: 21, final: "" });
+        state.tariffsRows.push(defaultTariffRow());
       }
       persistTariffsRows();
       renderTariffsTable();
@@ -1613,7 +1673,7 @@ if ($("workspaceWorkspacePageBtn")) $("workspaceWorkspacePageBtn").onclick = () 
 $("closeCalendarModal").onclick = () => $("calendarModal").classList.add("hidden");
 $("closeTariffsModal").onclick = () => $("tariffsModal").classList.add("hidden");
 $("addTariffRowBtn").onclick = () => {
-  state.tariffsRows.push({ storeName: "", commission: "", recoveryRate: "", iva: 21, final: "" });
+  state.tariffsRows.push(defaultTariffRow());
   persistTariffsRows();
   renderTariffsTable();
 };
