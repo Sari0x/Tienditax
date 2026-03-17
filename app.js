@@ -192,14 +192,12 @@ function renderTariffsTable() {
     const cleanStoreName = String(row.storeName || "").trim();
     row.logo = tariffStoreLogoByName(cleanStoreName) || row.logo || "";
     const logoPreview = row.logo ? `<img src="${row.logo}" alt="${row.storeName || "Tienda"}" class="tariff-store-logo" />` : "";
-    const storeDisplay = cleanStoreName
-      ? `<div class="tariff-store-display">${logoPreview}<span>${cleanStoreName}</span></div>`
-      : `<div class="tariff-store-display logo-only">${logoPreview || '<span>-</span>'}</div>`;
+    const storeDisplay = `<div class="tariff-store-display logo-only">${logoPreview || '<span>-</span>'}</div>`;
     const selectOptions = [`<option value="">Seleccionar tienda</option>`, ...TARIFF_STORE_OPTIONS.map((opt) => `<option value="${opt.value}" ${opt.value === row.storeName ? "selected" : ""}>${opt.value}</option>`)].join("");
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
-        ${locked ? storeDisplay : `<div class="tariff-store-editor"><select data-tariff-row="${index}" data-tariff-field="storeName">${selectOptions}</select>${logoPreview}</div>`}
+        ${locked ? storeDisplay : `<div class="tariff-store-editor"><select data-tariff-row="${index}" data-tariff-field="storeName">${selectOptions}</select></div>`}
       </td>
       <td><input type="text" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" ${locked ? "readonly" : ""} /></td>
       <td><input type="text" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" ${locked ? "readonly" : ""} /></td>
