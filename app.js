@@ -18,7 +18,7 @@ const CATEGORY_STORE_OPTIONS = [
 
 const ADMIN_USER = "manusario";
 
-let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null, theme: "light", calendarEvents: [], calendarEditingId: null };
+let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null, theme: "light", calendarEvents: [], calendarEditingId: null, tariffsRows: [] };
 let calendarInstance = null;
 const $ = (id) => document.getElementById(id);
 const dbGet = async (path) => (await fetch(`${DB_URL}/${path}.json`)).json();
@@ -79,6 +79,105 @@ function loadCalendarEvents() {
 
 function persistCalendarEvents() {
   localStorage.setItem(calendarStorageKey(), JSON.stringify(state.calendarEvents));
+}
+
+function tariffsStorageKey() {
+  return `ttx_tariffs_rows_${state.user || "guest"}`;
+}
+
+function loadTariffsRows() {
+  try {
+    const raw = localStorage.getItem(tariffsStorageKey());
+    const parsed = JSON.parse(raw || "[]");
+    state.tariffsRows = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    state.tariffsRows = [];
+  }
+  if (!state.tariffsRows.length) {
+    state.tariffsRows = [{ storeName: "", commission: "", recoveryRate: "", iva: 21, final: "" }];
+  }
+}
+
+function persistTariffsRows() {
+  localStorage.setItem(tariffsStorageKey(), JSON.stringify(state.tariffsRows));
+}
+
+function normalizePercentInput(value) {
+  const raw = String(value ?? "").trim().replace(",", ".");
+  if (!raw) return 0;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) return null;
+  return numeric > 1 ? numeric / 100 : numeric;
+}
+
+function computeTariffFinal(commissionInput, recoveryInput, ivaInput = 0.21) {
+  const commission = normalizePercentInput(commissionInput);
+  const recovery = normalizePercentInput(recoveryInput);
+  if (commission === null || recovery === null) return "";
+  const discount = commission + recovery;
+  if (discount >= 1) return "";
+  const taxedDiscount = discount + (discount * ivaInput);
+  if (taxedDiscount >= 1) return "";
+  const increase = ((1 / (1 - taxedDiscount)) - 1) * 100;
+  return Number.isFinite(increase) ? increase.toFixed(2) : "";
+}
+
+function updateTariffRowFinal(rowIndex) {
+  const row = state.tariffsRows[rowIndex];
+  if (!row) return;
+  row.final = computeTariffFinal(row.commission, row.recoveryRate, 0.21);
+  const finalInput = document.querySelector(`input[data-tariff-final-row="${rowIndex}"]`);
+  if (finalInput) finalInput.value = row.final ? `${row.final}%` : "";
+}
+
+function renderTariffsTable() {
+  const tbody = $("tariffsTableBody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  state.tariffsRows.forEach((row, index) => {
+    row.final = computeTariffFinal(row.commission, row.recoveryRate, 0.21);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input type="text" data-tariff-row="${index}" data-tariff-field="storeName" placeholder="Ej: Tienda BNA" value="${row.storeName || ""}" /></td>
+      <td><input type="text" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" /></td>
+      <td><input type="text" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" /></td>
+      <td><input type="text" value="21%" class="locked" readonly /></td>
+      <td><input type="text" data-tariff-final-row="${index}" value="${row.final ? `${row.final}%` : ""}" class="locked" readonly /></td>
+      <td><button class="icon-action danger" type="button" data-del-tariff-row="${index}" aria-label="Eliminar fila">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll("input[data-tariff-row]").forEach((input) => {
+    input.oninput = (e) => {
+      const rowIndex = Number(e.target.dataset.tariffRow);
+      const field = e.target.dataset.tariffField;
+      if (!state.tariffsRows[rowIndex]) return;
+      state.tariffsRows[rowIndex][field] = e.target.value;
+      updateTariffRowFinal(rowIndex);
+      persistTariffsRows();
+    };
+  });
+
+  tbody.querySelectorAll("[data-del-tariff-row]").forEach((btn) => {
+    btn.onclick = () => {
+      const rowIndex = Number(btn.dataset.delTariffRow);
+      state.tariffsRows.splice(rowIndex, 1);
+      if (!state.tariffsRows.length) {
+        state.tariffsRows.push({ storeName: "", commission: "", recoveryRate: "", iva: 21, final: "" });
+      }
+      persistTariffsRows();
+      renderTariffsTable();
+    };
+  });
+}
+
+function openTariffsModal() {
+  closeAllDrawers();
+  loadTariffsRows();
+  renderTariffsTable();
+  $("tariffsModal").classList.remove("hidden");
 }
 
 function updateCalendarColorPreview(color) {
@@ -1376,6 +1475,7 @@ async function init() {
   loadUserThemePreference();
   applyUserPreferences();
   loadCalendarEvents();
+  loadTariffsRows();
 
   window.addEventListener("resize", syncTopScrollbar);
 
@@ -1390,6 +1490,7 @@ async function init() {
     loadUserThemePreference(state.user);
     applyUserPreferences();
     loadCalendarEvents();
+    loadTariffsRows();
     const rememberedStore = localStorage.getItem(`ttx_store_${state.user}`);
     if (rememberedStore) {
       await selectStore(rememberedStore);
@@ -1402,6 +1503,7 @@ async function init() {
     loadUserThemePreference(lastUser);
     applyUserPreferences();
     loadCalendarEvents();
+    loadTariffsRows();
     switchView("loginView");
   }
 }
@@ -1504,9 +1606,17 @@ $("workspaceConverterBtn").onclick = () => { closeAllDrawers(); $("converterModa
 $("closeConverterModal").onclick = () => $("converterModal").classList.add("hidden");
 $("menuCalendarBtn").onclick = openCalendarModal;
 $("workspaceCalendarBtn").onclick = openCalendarModal;
+$("menuTariffsBtn").onclick = openTariffsModal;
+$("workspaceTariffsBtn").onclick = openTariffsModal;
 if ($("menuWorkspacePageBtn")) $("menuWorkspacePageBtn").onclick = () => { closeAllDrawers(); window.location.href = "workspace.html"; };
 if ($("workspaceWorkspacePageBtn")) $("workspaceWorkspacePageBtn").onclick = () => { closeAllDrawers(); window.location.href = "workspace.html"; };
 $("closeCalendarModal").onclick = () => $("calendarModal").classList.add("hidden");
+$("closeTariffsModal").onclick = () => $("tariffsModal").classList.add("hidden");
+$("addTariffRowBtn").onclick = () => {
+  state.tariffsRows.push({ storeName: "", commission: "", recoveryRate: "", iva: 21, final: "" });
+  persistTariffsRows();
+  renderTariffsTable();
+};
 $("calendarSaveBtn").onclick = saveCalendarEvent;
 $("calendarEventColor").oninput = (e) => updateCalendarColorPreview(e.target.value);
 $("calendarCancelEditBtn").onclick = resetCalendarForm;
