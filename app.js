@@ -195,15 +195,16 @@ function renderTariffsTable() {
     const storeDisplay = `<div class="tariff-store-display logo-only">${logoPreview || '<span>-</span>'}</div>`;
     const selectOptions = [`<option value="">Seleccionar tienda</option>`, ...TARIFF_STORE_OPTIONS.map((opt) => `<option value="${opt.value}" ${opt.value === row.storeName ? "selected" : ""}>${opt.value}</option>`)].join("");
     const tr = document.createElement("tr");
+    const readonlyClass = locked ? "tariff-readonly" : "";
     tr.innerHTML = `
       <td>
         ${locked ? storeDisplay : `<div class="tariff-store-editor"><select data-tariff-row="${index}" data-tariff-field="storeName">${selectOptions}</select></div>`}
       </td>
-      <td><input type="text" data-tariff-row="${index}" data-tariff-field="installments" placeholder="Ej: 6 sin interés" value="${row.installments || ""}" ${locked ? "readonly" : ""} /></td>
-      <td><input type="text" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" ${locked ? "readonly" : ""} /></td>
-      <td><input type="text" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" ${locked ? "readonly" : ""} /></td>
-      <td><input type="text" value="21%" class="locked" readonly /></td>
-      <td><input type="text" data-tariff-final-row="${index}" value="${row.final ? `${row.final}%` : ""}" class="locked" readonly /></td>
+      <td><input type="text" class="${readonlyClass}" data-tariff-row="${index}" data-tariff-field="installments" placeholder="Ej: 6 sin interés" value="${row.installments || ""}" ${locked ? "readonly" : ""} /></td>
+      <td><input type="text" class="${readonlyClass}" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" ${locked ? "readonly" : ""} /></td>
+      <td><input type="text" class="${readonlyClass}" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" ${locked ? "readonly" : ""} /></td>
+      <td><input type="text" value="21%" class="locked ${readonlyClass}" readonly /></td>
+      <td><input type="text" data-tariff-final-row="${index}" value="${row.final ? `${row.final}%` : ""}" class="locked ${readonlyClass}" readonly /></td>
       <td>
         <div class="tariff-row-actions">
           <button class="icon-action ${locked ? "" : "hidden"}" type="button" data-edit-tariff-row="${index}" aria-label="Editar fila"><i class="bi bi-pencil"></i></button>
