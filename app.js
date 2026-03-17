@@ -4,6 +4,13 @@ const stores = [
   { key: "macro", name: "Tienda Macro", logo: "https://i.ibb.co/cXFYN9bx/tienda-macro-logo.png" },
   { key: "ciudad", name: "Tienda Ciudad", logo: "https://i.ibb.co/Gf90gWxd/tienda-ciudad-logo.png" },
 ];
+const TARIFF_STORE_OPTIONS = [
+  { value: "Tienda BNA", logo: "https://i.postimg.cc/zGvL3N9r/tienda-bna-logo.png" },
+  { value: "Tienda Macro", logo: "https://i.postimg.cc/7ZhCb4p4/tienda-macro-logo.png" },
+  { value: "Tienda Ciudad", logo: "https://i.postimg.cc/y8xJWKwz/tienda-ciudad-logo.png" },
+  { value: "Provincia Compras", logo: "https://i.postimg.cc/2Syq3YPm/tienda-provincia-compras-logo.png" },
+  { value: "Tienda Bancor", logo: "https://i.postimg.cc/x18kqQWr/tienda-bancor-logo.png" },
+];
 const STORE_FIELDS = {
   bna: ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU", "BRAND", "ORIGIN_OF_PRODUCT"],
   ciudad: ["Title", "Description", "Category", "Transaction Type", "Manufacturer", "Price", "Price Without Taxes", "Available On", "Sale Price", "Sale Price Without Taxes", "sale_on", "sale_until", "Height", "Length", "Width", "Weight", "Property Quantity", "Property Names", "Property Values", "Property SKU", "BRAND", "ORIGIN_OF_PRODUCT"],
@@ -85,25 +92,60 @@ function tariffsStorageKey() {
   return `ttx_tariffs_rows_${state.user || "guest"}`;
 }
 
+function tariffsDbPath() {
+  return `tariffs/${state.user || "guest"}`;
+}
+
 function defaultTariffRow() {
   return { storeName: "", commission: "", recoveryRate: "", iva: 21, final: "", logo: "", locked: false };
 }
 
-function loadTariffsRows() {
-  try {
-    const raw = localStorage.getItem(tariffsStorageKey());
-    const parsed = JSON.parse(raw || "[]");
-    state.tariffsRows = Array.isArray(parsed) ? parsed.map((row) => ({ ...defaultTariffRow(), ...(row || {}) })) : [];
-  } catch {
-    state.tariffsRows = [];
-  }
-  if (!state.tariffsRows.length) {
-    state.tariffsRows = [defaultTariffRow()];
-  }
+function tariffStoreLogoByName(storeName) {
+  const name = String(storeName || "").trim();
+  return TARIFF_STORE_OPTIONS.find((item) => item.value === name)?.logo || "";
 }
 
-function persistTariffsRows() {
-  localStorage.setItem(tariffsStorageKey(), JSON.stringify(state.tariffsRows));
+function normalizeTariffRow(rawRow) {
+  const row = { ...defaultTariffRow(), ...(rawRow || {}) };
+  row.storeName = String(row.storeName || "").trim();
+  row.logo = tariffStoreLogoByName(row.storeName) || row.logo || "";
+  row.locked = !!row.locked;
+  row.final = computeTariffFinal(row.commission, row.recoveryRate, 0.21);
+  return row;
+}
+
+async function loadTariffsRows() {
+  let loaded = [];
+  try {
+    const remote = await dbGet(tariffsDbPath());
+    loaded = Array.isArray(remote) ? remote : [];
+  } catch {
+    loaded = [];
+  }
+
+  if (!loaded.length) {
+    try {
+      const raw = localStorage.getItem(tariffsStorageKey());
+      const parsed = JSON.parse(raw || "[]");
+      loaded = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      loaded = [];
+    }
+  }
+
+  state.tariffsRows = loaded.map((row) => normalizeTariffRow(row));
+  if (!state.tariffsRows.length) state.tariffsRows = [defaultTariffRow()];
+}
+
+async function persistTariffsRows() {
+  const normalized = (state.tariffsRows || []).map((row) => normalizeTariffRow(row));
+  state.tariffsRows = normalized;
+  localStorage.setItem(tariffsStorageKey(), JSON.stringify(normalized));
+  try {
+    await dbPut(tariffsDbPath(), normalized);
+  } catch {
+    // fallback local already saved
+  }
 }
 
 function normalizePercentInput(value) {
@@ -148,16 +190,16 @@ function renderTariffsTable() {
     row.final = computeTariffFinal(row.commission, row.recoveryRate, 0.21);
     const locked = !!row.locked;
     const cleanStoreName = String(row.storeName || "").trim();
+    row.logo = tariffStoreLogoByName(cleanStoreName) || row.logo || "";
     const logoPreview = row.logo ? `<img src="${row.logo}" alt="${row.storeName || "Tienda"}" class="tariff-store-logo" />` : "";
     const storeDisplay = cleanStoreName
       ? `<div class="tariff-store-display">${logoPreview}<span>${cleanStoreName}</span></div>`
       : `<div class="tariff-store-display logo-only">${logoPreview || '<span>-</span>'}</div>`;
+    const selectOptions = [`<option value="">Seleccionar tienda</option>`, ...TARIFF_STORE_OPTIONS.map((opt) => `<option value="${opt.value}" ${opt.value === row.storeName ? "selected" : ""}>${opt.value}</option>`)].join("");
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
-        ${locked ? storeDisplay : `<div class="tariff-store-editor"><input type="text" data-tariff-row="${index}" data-tariff-field="storeName" placeholder="Ej: Tienda BNA" value="${row.storeName || ""}" />
-        <label class="tariff-logo-upload" title="Adjuntar logo"><input type="file" accept="image/*" data-tariff-logo-row="${index}" /><i class="bi bi-image"></i></label>
-        ${logoPreview}</div>`}
+        ${locked ? storeDisplay : `<div class="tariff-store-editor"><select data-tariff-row="${index}" data-tariff-field="storeName">${selectOptions}</select>${logoPreview}</div>`}
       </td>
       <td><input type="text" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" ${locked ? "readonly" : ""} /></td>
       <td><input type="text" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" ${locked ? "readonly" : ""} /></td>
@@ -174,31 +216,22 @@ function renderTariffsTable() {
     tbody.appendChild(tr);
   });
 
-  tbody.querySelectorAll("input[data-tariff-row]").forEach((input) => {
-    input.oninput = (e) => {
+  tbody.querySelectorAll("input[data-tariff-row], select[data-tariff-row]").forEach((input) => {
+    const sync = (e) => {
       const rowIndex = Number(e.target.dataset.tariffRow);
       const field = e.target.dataset.tariffField;
       if (!state.tariffsRows[rowIndex]) return;
       if (state.tariffsRows[rowIndex].locked) return;
       state.tariffsRows[rowIndex][field] = e.target.value;
+      if (field === "storeName") {
+        state.tariffsRows[rowIndex].logo = tariffStoreLogoByName(e.target.value);
+      }
       updateTariffRowFinal(rowIndex);
       persistTariffsRows();
+      if (field === "storeName") renderTariffsTable();
     };
-  });
-
-  tbody.querySelectorAll("input[data-tariff-logo-row]").forEach((input) => {
-    input.onchange = (e) => {
-      const rowIndex = Number(e.target.dataset.tariffLogoRow);
-      const file = e.target.files?.[0];
-      if (!file || !state.tariffsRows[rowIndex]) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        state.tariffsRows[rowIndex].logo = String(reader.result || "");
-        persistTariffsRows();
-        renderTariffsTable();
-      };
-      reader.readAsDataURL(file);
-    };
+    input.oninput = sync;
+    input.onchange = sync;
   });
 
   tbody.querySelectorAll("[data-lock-tariff-row]").forEach((btn) => {
@@ -236,9 +269,9 @@ function renderTariffsTable() {
   });
 }
 
-function openTariffsModal() {
+async function openTariffsModal() {
   closeAllDrawers();
-  loadTariffsRows();
+  await loadTariffsRows();
   renderTariffsTable();
   $("tariffsModal").classList.remove("hidden");
 }
@@ -1538,7 +1571,7 @@ async function init() {
   loadUserThemePreference();
   applyUserPreferences();
   loadCalendarEvents();
-  loadTariffsRows();
+  await loadTariffsRows();
 
   window.addEventListener("resize", syncTopScrollbar);
 
@@ -1553,7 +1586,7 @@ async function init() {
     loadUserThemePreference(state.user);
     applyUserPreferences();
     loadCalendarEvents();
-    loadTariffsRows();
+    await loadTariffsRows();
     const rememberedStore = localStorage.getItem(`ttx_store_${state.user}`);
     if (rememberedStore) {
       await selectStore(rememberedStore);
@@ -1566,7 +1599,7 @@ async function init() {
     loadUserThemePreference(lastUser);
     applyUserPreferences();
     loadCalendarEvents();
-    loadTariffsRows();
+    await loadTariffsRows();
     switchView("loginView");
   }
 }
@@ -1675,9 +1708,9 @@ if ($("menuWorkspacePageBtn")) $("menuWorkspacePageBtn").onclick = () => { close
 if ($("workspaceWorkspacePageBtn")) $("workspaceWorkspacePageBtn").onclick = () => { closeAllDrawers(); window.location.href = "workspace.html"; };
 $("closeCalendarModal").onclick = () => $("calendarModal").classList.add("hidden");
 $("closeTariffsModal").onclick = () => $("tariffsModal").classList.add("hidden");
-$("addTariffRowBtn").onclick = () => {
+$("addTariffRowBtn").onclick = async () => {
   state.tariffsRows.push(defaultTariffRow());
-  persistTariffsRows();
+  await persistTariffsRows();
   renderTariffsTable();
 };
 $("calendarSaveBtn").onclick = saveCalendarEvent;
