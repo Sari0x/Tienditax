@@ -97,7 +97,7 @@ function tariffsDbPath() {
 }
 
 function defaultTariffRow() {
-  return { storeName: "", commission: "", recoveryRate: "", iva: 21, final: "", logo: "", locked: false };
+  return { storeName: "", installments: "", commission: "", recoveryRate: "", iva: 21, final: "", logo: "", locked: false };
 }
 
 function tariffStoreLogoByName(storeName) {
@@ -199,6 +199,7 @@ function renderTariffsTable() {
       <td>
         ${locked ? storeDisplay : `<div class="tariff-store-editor"><select data-tariff-row="${index}" data-tariff-field="storeName">${selectOptions}</select></div>`}
       </td>
+      <td><input type="text" data-tariff-row="${index}" data-tariff-field="installments" placeholder="Ej: 6 sin interés" value="${row.installments || ""}" ${locked ? "readonly" : ""} /></td>
       <td><input type="text" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" ${locked ? "readonly" : ""} /></td>
       <td><input type="text" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" ${locked ? "readonly" : ""} /></td>
       <td><input type="text" value="21%" class="locked" readonly /></td>
