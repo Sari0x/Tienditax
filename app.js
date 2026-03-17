@@ -104,7 +104,7 @@ function persistTariffsRows() {
 
 function normalizePercentInput(value) {
   const raw = String(value ?? "").trim().replace(",", ".");
-  if (!raw) return null;
+  if (!raw) return 0;
   const numeric = Number(raw);
   if (!Number.isFinite(numeric)) return null;
   return numeric > 1 ? numeric / 100 : numeric;
@@ -122,6 +122,14 @@ function computeTariffFinal(commissionInput, recoveryInput, ivaInput = 0.21) {
   return Number.isFinite(increase) ? increase.toFixed(2) : "";
 }
 
+function updateTariffRowFinal(rowIndex) {
+  const row = state.tariffsRows[rowIndex];
+  if (!row) return;
+  row.final = computeTariffFinal(row.commission, row.recoveryRate, 0.21);
+  const finalInput = document.querySelector(`input[data-tariff-final-row="${rowIndex}"]`);
+  if (finalInput) finalInput.value = row.final ? `${row.final}%` : "";
+}
+
 function renderTariffsTable() {
   const tbody = $("tariffsTableBody");
   if (!tbody) return;
@@ -135,7 +143,7 @@ function renderTariffsTable() {
       <td><input type="text" data-tariff-row="${index}" data-tariff-field="commission" placeholder="Ej: 30,45 o 0.3045" value="${row.commission || ""}" /></td>
       <td><input type="text" data-tariff-row="${index}" data-tariff-field="recoveryRate" placeholder="Ej: 5" value="${row.recoveryRate || ""}" /></td>
       <td><input type="text" value="21%" class="locked" readonly /></td>
-      <td><input type="text" value="${row.final ? `${row.final}%` : ""}" class="locked" readonly /></td>
+      <td><input type="text" data-tariff-final-row="${index}" value="${row.final ? `${row.final}%` : ""}" class="locked" readonly /></td>
       <td><button class="icon-action danger" type="button" data-del-tariff-row="${index}" aria-label="Eliminar fila">✕</button></td>
     `;
     tbody.appendChild(tr);
@@ -147,9 +155,8 @@ function renderTariffsTable() {
       const field = e.target.dataset.tariffField;
       if (!state.tariffsRows[rowIndex]) return;
       state.tariffsRows[rowIndex][field] = e.target.value;
-      state.tariffsRows[rowIndex].final = computeTariffFinal(state.tariffsRows[rowIndex].commission, state.tariffsRows[rowIndex].recoveryRate, 0.21);
+      updateTariffRowFinal(rowIndex);
       persistTariffsRows();
-      renderTariffsTable();
     };
   });
 
