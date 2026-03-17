@@ -49,6 +49,7 @@
             <button id="menuCategoriesBtn" class="ios-btn ghost">Categorías</button>
             <button id="menuConverterBtn" class="ios-btn ghost">Convertidor</button>
             <button id="menuCalendarBtn" class="ios-btn ghost">Calendario</button>
+            <button id="menuTariffsBtn" class="ios-btn ghost">Aranceles</button>
             <div class="preferences-panel drawer-preferences">
               <label class="setting-switch" for="themeToggleMenu">
                 <span class="setting-label"><i class="bi bi-moon-stars"></i> Modo oscuro</span>
@@ -88,6 +89,7 @@
             <button id="workspaceCategoriesBtn" class="ios-btn ghost">Categorías</button>
             <button id="workspaceConverterBtn" class="ios-btn ghost">Convertidor</button>
             <button id="workspaceCalendarBtn" class="ios-btn ghost">Calendario</button>
+            <button id="workspaceTariffsBtn" class="ios-btn ghost">Aranceles</button>
             <div class="preferences-panel drawer-preferences">
               <label class="setting-switch" for="themeToggleWorkspace">
                 <span class="setting-label"><i class="bi bi-moon-stars"></i> Modo oscuro</span>
@@ -238,6 +240,35 @@
               <button id="calendarCancelEditBtn" class="ios-btn ghost small hidden">Cancelar edición</button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tariffsModal" class="modal hidden">
+      <div class="modal-card tariffs-modal-card">
+        <div class="drawer-header">
+          <h3>Aranceles</h3>
+          <button id="closeTariffsModal" class="icon-btn close-btn">✕</button>
+        </div>
+        <p class="tariffs-help">Completá cada fila para calcular automáticamente el campo Final.</p>
+        <div class="tariffs-table-wrap">
+          <table class="tariffs-table">
+            <thead>
+              <tr>
+                <th>Nombre de tienda</th>
+                <th>Cuotas</th>
+                <th>Comisión (%)</th>
+                <th>Tasa de recupero (%)</th>
+                <th>IVA (%)</th>
+                <th>Final (%)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tariffsTableBody"></tbody>
+          </table>
+        </div>
+        <div class="confirm-actions tariffs-actions">
+          <button id="addTariffRowBtn" class="ios-btn ghost small">+ Agregar fila</button>
         </div>
       </div>
     </div>
