@@ -45,6 +45,7 @@
               <h3>Menú</h3>
               <button id="closeMenuBtn" class="icon-btn close-btn">✕</button>
             </div>
+            <button id="menuStoresBtn" class="ios-btn ghost">Tiendas</button>
             <button id="menuHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="menuCategoriesBtn" class="ios-btn ghost">Categorías</button>
             <button id="menuConverterBtn" class="ios-btn ghost">Convertidor</button>
@@ -62,7 +63,11 @@
             <button id="menuLogoutBtn" class="ios-btn soft-danger">Cerrar sesión</button>
           </div>
         </div>
-        <div id="storeButtons" class="store-grid"></div>
+        <div class="home-hero">
+          <img class="home-hero-logo" src="https://i.postimg.cc/7ZCqMsHy/tienditax-completo-logo.png" alt="Tienditax logo" />
+          <h1>Bienvenido a Tienditax</h1>
+          <p>Elegí <strong>Tiendas</strong> en el menú para comenzar tu carga de productos.</p>
+        </div>
       </section>
 
       <section id="workspaceView" class="view">
@@ -85,6 +90,7 @@
               <h3>Menú</h3>
               <button id="closeWorkspaceMenuBtn" class="icon-btn close-btn">✕</button>
             </div>
+            <button id="workspaceStoresBtn" class="ios-btn ghost">Tiendas</button>
             <button id="workspaceHistorialBtn" class="ios-btn ghost">Historial</button>
             <button id="workspaceCategoriesBtn" class="ios-btn ghost">Categorías</button>
             <button id="workspaceConverterBtn" class="ios-btn ghost">Convertidor</button>
@@ -276,7 +282,7 @@
     <div id="storeSwitchModal" class="modal hidden">
       <div class="modal-card small-modal">
         <div class="drawer-header">
-          <h3>Cambiar de tienda</h3>
+          <h3>Tiendas</h3>
           <button id="closeStoreSwitchModal" class="icon-btn close-btn">✕</button>
         </div>
         <div id="storeSwitchList" class="switch-list"></div>
@@ -299,11 +305,6 @@
       <img src="https://i.postimg.cc/fbH7b8Vt/spinner-tienditax.png" alt="Cargando" class="loading-spinner" />
     </div>
 
-    <template id="storeButtonTemplate">
-      <button class="store-btn">
-        <img alt="logo tienda" />
-      </button>
-    </template>
 
     <script src="app.js"></script>
   </body>

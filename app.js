@@ -886,24 +886,14 @@ async function startConversion() {
   if (state.historyMode === "conversions") loadHistory();
 }
 
-function renderStoreButtons() {
-  const container = $("storeButtons");
-  const tpl = $("storeButtonTemplate");
-  container.innerHTML = "";
-  stores.forEach((store) => {
-    const node = tpl.content.firstElementChild.cloneNode(true);
-    node.querySelector("img").src = store.logo;
-    node.onclick = () => selectStore(store.key);
-    container.appendChild(node);
-  });
-}
 function renderStoreSwitchList() {
   const list = $("storeSwitchList");
+  if (!list) return;
   list.innerHTML = "";
-  stores.filter((s) => s.key !== state.currentStore).forEach((store) => {
+  stores.forEach((store) => {
     const btn = document.createElement("button");
-    btn.className = "ios-btn";
-    btn.textContent = store.name;
+    btn.className = "store-select-btn";
+    btn.innerHTML = `<img src="${store.logo}" alt="${store.name}" /><span>${store.name}</span>`;
     btn.onclick = async () => {
       $("storeSwitchModal").classList.add("hidden");
       await selectStore(store.key);
@@ -1551,7 +1541,6 @@ function closeAllDrawers() {
 }
 
 async function init() {
-  renderStoreButtons();
   renderCategorySelectOptions();
 
   const categoriesRemote = await dbGet("categories");
@@ -1688,6 +1677,8 @@ $("workspaceMenuBtn").onclick = () => $("workspaceDrawer").classList.toggle("ope
 $("closeMenuBtn").onclick = closeAllDrawers;
 $("closeWorkspaceMenuBtn").onclick = closeAllDrawers;
 
+$("menuStoresBtn").onclick = () => { closeAllDrawers(); renderStoreSwitchList(); $("storeSwitchModal").classList.remove("hidden"); };
+$("workspaceStoresBtn").onclick = () => { closeAllDrawers(); renderStoreSwitchList(); $("storeSwitchModal").classList.remove("hidden"); };
 $("menuHistorialBtn").onclick = () => { closeAllDrawers(); state.historyMode = "exports"; state.historyPage = 1; updateHistoryTabs(); $("historyModal").classList.remove("hidden"); loadHistory(); };
 $("workspaceHistorialBtn").onclick = () => { closeAllDrawers(); state.historyMode = "exports"; state.historyPage = 1; updateHistoryTabs(); $("historyModal").classList.remove("hidden"); loadHistory(); };
 $("closeHistoryModal").onclick = () => $("historyModal").classList.add("hidden");

@@ -57,6 +57,73 @@ input, select, textarea { border-radius: 14px; border: 1px solid var(--line); pa
 .title-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .actions-wrap { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .icon-btn { width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer; background: var(--surface-3); color: #1b56a8; font-size: 20px; font-weight: 700; }
+
+.home-hero {
+  min-height: calc(100vh - 170px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  animation: fadeUp .65s ease;
+}
+
+.home-hero-logo {
+  width: min(500px, 90vw);
+  filter: drop-shadow(0 20px 35px rgba(10, 84, 208, 0.2));
+  animation: floatLogo 4s ease-in-out infinite;
+}
+
+.home-hero h1 {
+  margin: 0;
+  font-size: clamp(30px, 4vw, 48px);
+  letter-spacing: -0.03em;
+}
+
+.home-hero p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.store-select-btn {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-1);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.store-select-btn img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 12px;
+  padding: 6px;
+}
+
+.store-select-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes floatLogo {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
 .close-btn { width: 36px; height: 36px; font-size: 16px; }
 .store-grid { min-height: 70vh; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 280px)); place-content: center; gap: 20px; }
 .store-btn { width: 100%; height: 150px; border-radius: 24px; border: 1px solid var(--line); background: var(--surface-1); box-shadow: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: transform .25s ease; }
