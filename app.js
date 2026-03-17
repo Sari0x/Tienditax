@@ -147,8 +147,11 @@ function renderTariffsTable() {
   state.tariffsRows.forEach((row, index) => {
     row.final = computeTariffFinal(row.commission, row.recoveryRate, 0.21);
     const locked = !!row.locked;
+    const cleanStoreName = String(row.storeName || "").trim();
     const logoPreview = row.logo ? `<img src="${row.logo}" alt="${row.storeName || "Tienda"}" class="tariff-store-logo" />` : "";
-    const storeDisplay = `<div class="tariff-store-display">${logoPreview}<span>${row.storeName || "-"}</span></div>`;
+    const storeDisplay = cleanStoreName
+      ? `<div class="tariff-store-display">${logoPreview}<span>${cleanStoreName}</span></div>`
+      : `<div class="tariff-store-display logo-only">${logoPreview || '<span>-</span>'}</div>`;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
