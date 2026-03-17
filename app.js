@@ -1576,12 +1576,8 @@ async function init() {
     applyUserPreferences();
     loadCalendarEvents();
     await loadTariffsRows();
-    const rememberedStore = localStorage.getItem(`ttx_store_${state.user}`);
-    if (rememberedStore) {
-      await selectStore(rememberedStore);
-    } else {
-      switchView("storeView");
-    }
+    // No auto-abrimos la hoja de carga: solo se entra desde el botón "Tiendas".
+    switchView("storeView");
     loadHistory();
   } else {
     const lastUser = localStorage.getItem("ttx_last_user");
