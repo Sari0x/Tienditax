@@ -781,6 +781,10 @@ async function deleteEvent() {
   if (!state.editingId || !state.calendar) return;
   const ev = state.calendar.getEventById(state.editingId);
   if (!ev) return;
+  await cleanupEmailReminderTrigger({
+    id: ev.id,
+    extendedProps: { reminderJobIds: ev.extendedProps?.reminderJobIds || [] },
+  });
   ev.remove();
   await syncEventsFromCalendar();
   resetEventForm();
