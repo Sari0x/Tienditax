@@ -219,6 +219,37 @@ small { color: var(--muted); }
   color: #fff;
 }
 
+.calendar-event-card {
+  display: grid;
+  gap: 3px;
+}
+
+.calendar-event-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.calendar-event-main img,
+.calendar-event-main .logo-badge {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 6px !important;
+  flex: 0 0 auto;
+}
+
+.calendar-event-title {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-event-status {
+  justify-self: start;
+}
+
 .fc .fc-toolbar-title,
 .fc .fc-col-header-cell-cushion,
 .fc .fc-daygrid-day-number,
