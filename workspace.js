@@ -476,6 +476,10 @@ function saveTriggerConfig() {
     webhookUrl: $("triggerWebhookUrl").value.trim(),
     defaultEmail: $("triggerDefaultEmail").value.trim(),
   };
+  if (cfg.webhookUrl && !/\/(exec|dev)(\?|$)/.test(cfg.webhookUrl)) {
+    setTriggerStatus("Usá la URL desplegada del Web App (termina en /exec o /dev), no la URL /home/projects/.", true);
+    return;
+  }
   localStorage.setItem(storageKeyTriggerConfig(), JSON.stringify(cfg));
   setTriggerStatus("Configuración guardada.");
 }
@@ -503,6 +507,9 @@ function eventRecipients(eventData, cfg) {
 async function requestEmailReminderTrigger(eventData) {
   const cfg = loadTriggerConfig();
   if (!cfg.webhookUrl) return;
+  if (!/\/(exec|dev)(\?|$)/.test(cfg.webhookUrl)) {
+    throw new Error("La URL del webhook debe ser la del despliegue Web App (/exec o /dev), no /home/projects/");
+  }
 
   const startsAt = eventStartDate(eventData);
   if (!startsAt || eventData.allDay) {
@@ -516,7 +523,6 @@ async function requestEmailReminderTrigger(eventData) {
 
   const response = await fetch(cfg.webhookUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       action: "programar_recordatorio",
       eventId: eventData.id,
