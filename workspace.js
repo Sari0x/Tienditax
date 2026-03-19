@@ -36,7 +36,7 @@ const syncMeta = {
   events: { pending: false, lastError: null },
 };
 
-const TRIGGER_OFFSET_MINUTES = 30;
+const TRIGGER_DEFAULT_OFFSET_MINUTES = 30;
 
 function currentUser() {
   return localStorage.getItem("ttx_user") || "guest";
@@ -450,19 +450,33 @@ function eventFromForm(eventId, attachments) {
 function loadTriggerConfig() {
   try {
     const raw = JSON.parse(localStorage.getItem(storageKeyTriggerConfig()) || "{}");
+    const leadMinutesRaw = Number.parseInt(raw.leadMinutes, 10);
+    const leadMinutes = Number.isFinite(leadMinutesRaw) && leadMinutesRaw >= 0 ? leadMinutesRaw : TRIGGER_DEFAULT_OFFSET_MINUTES;
     return {
       webhookUrl: String(raw.webhookUrl || "").trim(),
       defaultEmail: String(raw.defaultEmail || "").trim(),
+      leadMinutes,
+      locked: raw.locked === undefined ? Boolean(raw.savedAt || raw.webhookUrl || raw.defaultEmail || raw.leadMinutes !== undefined) : !!raw.locked,
     };
   } catch {
-    return { webhookUrl: "", defaultEmail: "" };
+    return { webhookUrl: "", defaultEmail: "", leadMinutes: TRIGGER_DEFAULT_OFFSET_MINUTES, locked: false };
   }
+}
+
+function setTriggerConfigLocked(locked) {
+  $("triggerWebhookUrl").disabled = locked;
+  $("triggerDefaultEmail").disabled = locked;
+  $("triggerLeadMinutes").disabled = locked;
+  $("saveTriggerSettingsBtn").disabled = locked;
+  $("editTriggerSettingsBtn").disabled = !locked;
 }
 
 function renderTriggerConfig() {
   const cfg = loadTriggerConfig();
   $("triggerWebhookUrl").value = cfg.webhookUrl;
   $("triggerDefaultEmail").value = cfg.defaultEmail;
+  $("triggerLeadMinutes").value = String(cfg.leadMinutes);
+  setTriggerConfigLocked(cfg.locked);
 }
 
 function setTriggerStatus(message, isError = false) {
@@ -472,16 +486,34 @@ function setTriggerStatus(message, isError = false) {
 }
 
 function saveTriggerConfig() {
+  const leadMinutesRaw = Number.parseInt($("triggerLeadMinutes").value, 10);
+  const leadMinutes = Number.isFinite(leadMinutesRaw) ? leadMinutesRaw : TRIGGER_DEFAULT_OFFSET_MINUTES;
   const cfg = {
     webhookUrl: $("triggerWebhookUrl").value.trim(),
     defaultEmail: $("triggerDefaultEmail").value.trim(),
+    leadMinutes,
+    locked: true,
+    savedAt: new Date().toISOString(),
   };
   if (cfg.webhookUrl && !/\/(exec|dev)(\?|$)/.test(cfg.webhookUrl)) {
     setTriggerStatus("Usá la URL desplegada del Web App (termina en /exec o /dev), no la URL /home/projects/.", true);
     return;
   }
+  if (!Number.isFinite(cfg.leadMinutes) || cfg.leadMinutes < 0 || cfg.leadMinutes > 10080) {
+    setTriggerStatus("Definí minutos válidos entre 0 y 10080.", true);
+    return;
+  }
   localStorage.setItem(storageKeyTriggerConfig(), JSON.stringify(cfg));
-  setTriggerStatus("Configuración guardada.");
+  setTriggerConfigLocked(true);
+  setTriggerStatus("Configuración guardada y bloqueada. Usá “Editar configuración” para modificarla.");
+}
+
+function enableTriggerConfigEditing() {
+  const cfg = loadTriggerConfig();
+  cfg.locked = false;
+  localStorage.setItem(storageKeyTriggerConfig(), JSON.stringify(cfg));
+  setTriggerConfigLocked(false);
+  setTriggerStatus("Modo edición habilitado. Guardá nuevamente para bloquear la configuración.");
 }
 
 function eventStartDate(eventData) {
@@ -516,7 +548,15 @@ async function requestEmailReminderTrigger(eventData) {
     return;
   }
 
-  const remindAt = new Date(startsAt.getTime() - TRIGGER_OFFSET_MINUTES * 60000);
+  const leadMinutesRaw = Number.parseInt(cfg.leadMinutes, 10);
+  const leadMinutes = Number.isFinite(leadMinutesRaw) && leadMinutesRaw >= 0 ? leadMinutesRaw : TRIGGER_DEFAULT_OFFSET_MINUTES;
+  const now = Date.now();
+  if (startsAt.getTime() <= now) {
+    return;
+  }
+  const remindAtTarget = startsAt.getTime() - leadMinutes * 60000;
+  const minFutureMs = 2 * 60000;
+  const remindAt = new Date(Math.max(remindAtTarget, now + minFutureMs));
   const recipients = eventRecipients(eventData, cfg);
   const to = recipients[0] || "";
   if (!to && !cfg.defaultEmail) return;
@@ -812,6 +852,7 @@ async function init() {
   $("cancelEditEventBtn").onclick = resetEventForm;
   $("createProfileBtn").onclick = createProfile;
   $("saveTriggerSettingsBtn").onclick = saveTriggerConfig;
+  $("editTriggerSettingsBtn").onclick = enableTriggerConfigEditing;
   $("backAppBtn").onclick = () => { window.location.href = "index.html"; };
   window.addEventListener("online", flushPendingSync);
 }
