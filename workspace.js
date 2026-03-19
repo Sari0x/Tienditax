@@ -605,11 +605,12 @@ function initCalendar() {
       const status = STATUS_MAP[ext.status || "sin_estado"];
       const attachmentMark = ext.attachments?.length ? "📎" : "";
       const wrap = document.createElement("div");
-      wrap.innerHTML = `<div style="display:flex;align-items:center;gap:5px;min-width:0;">
-        ${companyLogoHtml(company, 18)}
-        <span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${arg.event.title} ${attachmentMark}</span>
+      wrap.className = "calendar-event-card";
+      wrap.innerHTML = `<div class="calendar-event-main">
+        ${companyLogoHtml(company, 24)}
+        <span class="calendar-event-title">${arg.event.title} ${attachmentMark}</span>
       </div>
-      <span class="status-pill" style="background:${status.color}">${status.label}</span>`;
+      <span class="status-pill calendar-event-status" style="background:${status.color}">${status.label}</span>`;
       return { domNodes: [wrap] };
     },
     eventDidMount: (arg) => {
