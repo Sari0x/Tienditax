@@ -103,6 +103,25 @@
         </section>
 
         <section class="card">
+          <h2>Recordatorios (Google Workspace)</h2>
+          <div class="field-block">
+            <label for="triggerWebhookUrl">URL Web App (Apps Script)</label>
+            <input id="triggerWebhookUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" />
+            <small>
+              Se enviará una solicitud para borrar triggers viejos del evento y crear uno nuevo 30 minutos antes del inicio.
+              Pegá la URL desplegada que termina en <strong>/exec</strong> (no la URL <code>/home/projects/...</code>).
+            </small>
+          </div>
+          <div class="field-block">
+            <label for="triggerDefaultEmail">Email de respaldo</label>
+            <input id="triggerDefaultEmail" type="email" placeholder="alertas@tu-dominio.com" />
+            <small>Si no hay asignados con email, se usa este mail como destinatario.</small>
+          </div>
+          <button id="saveTriggerSettingsBtn" class="btn ghost">Guardar configuración</button>
+          <small id="triggerSettingsStatus"></small>
+        </section>
+
+        <section class="card">
           <h2>Perfiles</h2>
           <div class="field-row">
             <input id="profileName" type="text" placeholder="Nombre" />
