@@ -442,7 +442,7 @@ function eventFromForm(eventId, attachments) {
       linkType: detectLinkTypeFromUrl($("eventLinkUrl").value) || $("eventLinkType").value,
       linkUrl: $("eventLinkUrl").value.trim(),
       attachments: attachments || [],
-      reminderJobIds: state.editingId ? state.calendar?.getEventById(state.editingId)?.extendedProps?.reminderJobIds || [] : [],
+      reminderTriggerUid: state.editingId ? state.calendar?.getEventById(state.editingId)?.extendedProps?.reminderTriggerUid || "" : "",
     },
   };
 }
@@ -511,24 +511,22 @@ async function requestEmailReminderTrigger(eventData) {
 
   const remindAt = new Date(startsAt.getTime() - TRIGGER_OFFSET_MINUTES * 60000);
   const recipients = eventRecipients(eventData, cfg);
-  if (!recipients.length) return;
+  const to = recipients[0] || "";
+  if (!to && !cfg.defaultEmail) return;
 
-  const previousJobIds = eventData.extendedProps?.reminderJobIds || [];
   const response = await fetch(cfg.webhookUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      action: "cleanup_and_schedule",
+      action: "programar_recordatorio",
       eventId: eventData.id,
-      title: eventData.title,
-      details: eventData.extendedProps?.details || "",
-      startAt: startsAt.toISOString(),
-      remindAt: remindAt.toISOString(),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      recipients,
-      previousJobIds,
-      offsetMinutes: TRIGGER_OFFSET_MINUTES,
-      linkUrl: eventData.extendedProps?.linkUrl || "",
+      to,
+      fallbackEmail: cfg.defaultEmail || "",
+      subject: `Recordatorio: ${eventData.title}`,
+      eventTitle: eventData.title,
+      eventStart: startsAt.toISOString(),
+      eventLink: eventData.extendedProps?.linkUrl || "",
+      sendAt: remindAt.toISOString(),
     }),
   });
 
@@ -537,24 +535,10 @@ async function requestEmailReminderTrigger(eventData) {
   }
 
   const payload = await response.json().catch(() => ({}));
-  eventData.extendedProps.reminderJobIds = Array.isArray(payload?.jobIds) ? payload.jobIds : [];
-}
-
-async function cleanupEmailReminderTrigger(eventData) {
-  const cfg = loadTriggerConfig();
-  if (!cfg.webhookUrl) return;
-  const previousJobIds = eventData?.extendedProps?.reminderJobIds || [];
-  if (!previousJobIds.length) return;
-
-  await fetch(cfg.webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "cleanup_only",
-      eventId: eventData.id,
-      previousJobIds,
-    }),
-  });
+  if (payload?.ok === false) {
+    throw new Error(payload.message || "Apps Script rechazó la programación del recordatorio");
+  }
+  eventData.extendedProps.reminderTriggerUid = String(payload?.triggerUid || "");
 }
 
 async function syncEventsFromCalendar() {
@@ -574,7 +558,7 @@ async function syncEventsFromCalendar() {
       linkType: ev.extendedProps?.linkType || "otro",
       linkUrl: ev.extendedProps?.linkUrl || "",
       attachments: ev.extendedProps?.attachments || [],
-      reminderJobIds: ev.extendedProps?.reminderJobIds || [],
+      reminderTriggerUid: ev.extendedProps?.reminderTriggerUid || "",
     },
     updatedAt: new Date().toISOString(),
   }));
@@ -774,7 +758,7 @@ async function saveEvent() {
 
     await requestEmailReminderTrigger(payload);
     if (targetEvent) {
-      targetEvent.setExtendedProp("reminderJobIds", payload.extendedProps.reminderJobIds || []);
+      targetEvent.setExtendedProp("reminderTriggerUid", payload.extendedProps.reminderTriggerUid || "");
     }
 
     await syncEventsFromCalendar();
