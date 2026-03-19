@@ -36,6 +36,8 @@ const syncMeta = {
   events: { pending: false, lastError: null },
 };
 
+const TRIGGER_DEFAULT_OFFSET_MINUTES = 30;
+
 function currentUser() {
   return localStorage.getItem("ttx_user") || "guest";
 }
@@ -99,6 +101,10 @@ function storageKeyProfiles() {
 
 function storageKeyEvents() {
   return `ttx_workspace_events_${currentUser()}`;
+}
+
+function storageKeyTriggerConfig() {
+  return `ttx_workspace_trigger_cfg_${currentUser()}`;
 }
 
 function randomAvatarColor() {
@@ -436,8 +442,149 @@ function eventFromForm(eventId, attachments) {
       linkType: detectLinkTypeFromUrl($("eventLinkUrl").value) || $("eventLinkType").value,
       linkUrl: $("eventLinkUrl").value.trim(),
       attachments: attachments || [],
+      reminderTriggerUid: state.editingId ? state.calendar?.getEventById(state.editingId)?.extendedProps?.reminderTriggerUid || "" : "",
     },
   };
+}
+
+function loadTriggerConfig() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(storageKeyTriggerConfig()) || "{}");
+    const leadMinutesRaw = Number.parseInt(raw.leadMinutes, 10);
+    const leadMinutes = Number.isFinite(leadMinutesRaw) && leadMinutesRaw >= 0 ? leadMinutesRaw : TRIGGER_DEFAULT_OFFSET_MINUTES;
+    return {
+      webhookUrl: String(raw.webhookUrl || "").trim(),
+      defaultEmail: String(raw.defaultEmail || "").trim(),
+      leadMinutes,
+      locked: raw.locked === undefined ? Boolean(raw.savedAt || raw.webhookUrl || raw.defaultEmail || raw.leadMinutes !== undefined) : !!raw.locked,
+    };
+  } catch {
+    return { webhookUrl: "", defaultEmail: "", leadMinutes: TRIGGER_DEFAULT_OFFSET_MINUTES, locked: false };
+  }
+}
+
+function setTriggerConfigLocked(locked) {
+  $("triggerWebhookUrl").disabled = locked;
+  $("triggerDefaultEmail").disabled = locked;
+  $("triggerLeadMinutes").disabled = locked;
+  $("saveTriggerSettingsBtn").disabled = locked;
+  $("editTriggerSettingsBtn").disabled = !locked;
+}
+
+function renderTriggerConfig() {
+  const cfg = loadTriggerConfig();
+  $("triggerWebhookUrl").value = cfg.webhookUrl;
+  $("triggerDefaultEmail").value = cfg.defaultEmail;
+  $("triggerLeadMinutes").value = String(cfg.leadMinutes);
+  setTriggerConfigLocked(cfg.locked);
+}
+
+function setTriggerStatus(message, isError = false) {
+  const node = $("triggerSettingsStatus");
+  node.textContent = message || "";
+  node.style.color = isError ? "#dc2626" : "#64748b";
+}
+
+function saveTriggerConfig() {
+  const leadMinutesRaw = Number.parseInt($("triggerLeadMinutes").value, 10);
+  const leadMinutes = Number.isFinite(leadMinutesRaw) ? leadMinutesRaw : TRIGGER_DEFAULT_OFFSET_MINUTES;
+  const cfg = {
+    webhookUrl: $("triggerWebhookUrl").value.trim(),
+    defaultEmail: $("triggerDefaultEmail").value.trim(),
+    leadMinutes,
+    locked: true,
+    savedAt: new Date().toISOString(),
+  };
+  if (cfg.webhookUrl && !/\/(exec|dev)(\?|$)/.test(cfg.webhookUrl)) {
+    setTriggerStatus("Usá la URL desplegada del Web App (termina en /exec o /dev), no la URL /home/projects/.", true);
+    return;
+  }
+  if (!Number.isFinite(cfg.leadMinutes) || cfg.leadMinutes < 0 || cfg.leadMinutes > 10080) {
+    setTriggerStatus("Definí minutos válidos entre 0 y 10080.", true);
+    return;
+  }
+  localStorage.setItem(storageKeyTriggerConfig(), JSON.stringify(cfg));
+  setTriggerConfigLocked(true);
+  setTriggerStatus("Configuración guardada y bloqueada. Usá “Editar configuración” para modificarla.");
+}
+
+function enableTriggerConfigEditing() {
+  const cfg = loadTriggerConfig();
+  cfg.locked = false;
+  localStorage.setItem(storageKeyTriggerConfig(), JSON.stringify(cfg));
+  setTriggerConfigLocked(false);
+  setTriggerStatus("Modo edición habilitado. Guardá nuevamente para bloquear la configuración.");
+}
+
+function eventStartDate(eventData) {
+  if (!eventData?.start) return null;
+  const parsed = new Date(eventData.start);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function eventRecipients(eventData, cfg) {
+  const ids = eventData?.extendedProps?.assignees || [];
+  const uniqueMails = new Set();
+  ids.forEach((id) => {
+    const profile = state.profiles.find((p) => p.id === id);
+    const mail = (profile?.mail || "").trim();
+    if (mail) uniqueMails.add(mail);
+  });
+  const fallback = (cfg.defaultEmail || "").trim();
+  if (!uniqueMails.size && fallback) uniqueMails.add(fallback);
+  return [...uniqueMails];
+}
+
+async function requestEmailReminderTrigger(eventData) {
+  const cfg = loadTriggerConfig();
+  if (!cfg.webhookUrl) return;
+  if (!/\/(exec|dev)(\?|$)/.test(cfg.webhookUrl)) {
+    throw new Error("La URL del webhook debe ser la del despliegue Web App (/exec o /dev), no /home/projects/");
+  }
+
+  const startsAt = eventStartDate(eventData);
+  if (!startsAt || eventData.allDay) {
+    return;
+  }
+
+  const leadMinutesRaw = Number.parseInt(cfg.leadMinutes, 10);
+  const leadMinutes = Number.isFinite(leadMinutesRaw) && leadMinutesRaw >= 0 ? leadMinutesRaw : TRIGGER_DEFAULT_OFFSET_MINUTES;
+  const now = Date.now();
+  if (startsAt.getTime() <= now) {
+    return;
+  }
+  const remindAtTarget = startsAt.getTime() - leadMinutes * 60000;
+  const minFutureMs = 2 * 60000;
+  const remindAt = new Date(Math.max(remindAtTarget, now + minFutureMs));
+  const recipients = eventRecipients(eventData, cfg);
+  const to = recipients[0] || "";
+  if (!to && !cfg.defaultEmail) return;
+
+  const response = await fetch(cfg.webhookUrl, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "programar_recordatorio",
+      eventId: eventData.id,
+      to,
+      fallbackEmail: cfg.defaultEmail || "",
+      subject: `Recordatorio: ${eventData.title}`,
+      eventTitle: eventData.title,
+      eventStart: startsAt.toISOString(),
+      eventLink: eventData.extendedProps?.linkUrl || "",
+      sendAt: remindAt.toISOString(),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("No se pudo crear el trigger de email en Apps Script");
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (payload?.ok === false) {
+    throw new Error(payload.message || "Apps Script rechazó la programación del recordatorio");
+  }
+  eventData.extendedProps.reminderTriggerUid = String(payload?.triggerUid || "");
 }
 
 async function syncEventsFromCalendar() {
@@ -457,6 +604,7 @@ async function syncEventsFromCalendar() {
       linkType: ev.extendedProps?.linkType || "otro",
       linkUrl: ev.extendedProps?.linkUrl || "",
       attachments: ev.extendedProps?.attachments || [],
+      reminderTriggerUid: ev.extendedProps?.reminderTriggerUid || "",
     },
     updatedAt: new Date().toISOString(),
   }));
@@ -624,6 +772,7 @@ async function saveEvent() {
   if (!state.calendar) return;
 
   const eventId = state.editingId || `ws_${Date.now()}`;
+  let targetEvent = null;
   $("saveEventBtn").disabled = true;
   $("saveEventBtn").textContent = "Guardando...";
 
@@ -648,8 +797,14 @@ async function saveEvent() {
       ev.setProp("backgroundColor", payload.backgroundColor);
       ev.setProp("borderColor", payload.borderColor);
       Object.entries(payload.extendedProps).forEach(([key, value]) => ev.setExtendedProp(key, value));
+      targetEvent = ev;
     } else {
-      state.calendar.addEvent(payload);
+      targetEvent = state.calendar.addEvent(payload);
+    }
+
+    await requestEmailReminderTrigger(payload);
+    if (targetEvent) {
+      targetEvent.setExtendedProp("reminderTriggerUid", payload.extendedProps.reminderTriggerUid || "");
     }
 
     await syncEventsFromCalendar();
@@ -678,6 +833,7 @@ async function init() {
   renderLinkTypeOptions();
   renderProfiles();
   renderAssigneesSelect();
+  renderTriggerConfig();
   resetEventForm();
   initCalendar();
 
@@ -691,6 +847,8 @@ async function init() {
   $("deleteEventBtn").onclick = deleteEvent;
   $("cancelEditEventBtn").onclick = resetEventForm;
   $("createProfileBtn").onclick = createProfile;
+  $("saveTriggerSettingsBtn").onclick = saveTriggerConfig;
+  $("editTriggerSettingsBtn").onclick = enableTriggerConfigEditing;
   $("backAppBtn").onclick = () => { window.location.href = "index.html"; };
   window.addEventListener("online", flushPendingSync);
 }
