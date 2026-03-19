@@ -36,6 +36,8 @@ const syncMeta = {
   events: { pending: false, lastError: null },
 };
 
+const TRIGGER_OFFSET_MINUTES = 30;
+
 function currentUser() {
   return localStorage.getItem("ttx_user") || "guest";
 }
@@ -99,6 +101,10 @@ function storageKeyProfiles() {
 
 function storageKeyEvents() {
   return `ttx_workspace_events_${currentUser()}`;
+}
+
+function storageKeyTriggerConfig() {
+  return `ttx_workspace_trigger_cfg_${currentUser()}`;
 }
 
 function randomAvatarColor() {
@@ -436,8 +442,119 @@ function eventFromForm(eventId, attachments) {
       linkType: detectLinkTypeFromUrl($("eventLinkUrl").value) || $("eventLinkType").value,
       linkUrl: $("eventLinkUrl").value.trim(),
       attachments: attachments || [],
+      reminderJobIds: state.editingId ? state.calendar?.getEventById(state.editingId)?.extendedProps?.reminderJobIds || [] : [],
     },
   };
+}
+
+function loadTriggerConfig() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(storageKeyTriggerConfig()) || "{}");
+    return {
+      webhookUrl: String(raw.webhookUrl || "").trim(),
+      defaultEmail: String(raw.defaultEmail || "").trim(),
+    };
+  } catch {
+    return { webhookUrl: "", defaultEmail: "" };
+  }
+}
+
+function renderTriggerConfig() {
+  const cfg = loadTriggerConfig();
+  $("triggerWebhookUrl").value = cfg.webhookUrl;
+  $("triggerDefaultEmail").value = cfg.defaultEmail;
+}
+
+function setTriggerStatus(message, isError = false) {
+  const node = $("triggerSettingsStatus");
+  node.textContent = message || "";
+  node.style.color = isError ? "#dc2626" : "#64748b";
+}
+
+function saveTriggerConfig() {
+  const cfg = {
+    webhookUrl: $("triggerWebhookUrl").value.trim(),
+    defaultEmail: $("triggerDefaultEmail").value.trim(),
+  };
+  localStorage.setItem(storageKeyTriggerConfig(), JSON.stringify(cfg));
+  setTriggerStatus("Configuración guardada.");
+}
+
+function eventStartDate(eventData) {
+  if (!eventData?.start) return null;
+  const parsed = new Date(eventData.start);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function eventRecipients(eventData, cfg) {
+  const ids = eventData?.extendedProps?.assignees || [];
+  const uniqueMails = new Set();
+  ids.forEach((id) => {
+    const profile = state.profiles.find((p) => p.id === id);
+    const mail = (profile?.mail || "").trim();
+    if (mail) uniqueMails.add(mail);
+  });
+  const fallback = (cfg.defaultEmail || "").trim();
+  if (!uniqueMails.size && fallback) uniqueMails.add(fallback);
+  return [...uniqueMails];
+}
+
+async function requestEmailReminderTrigger(eventData) {
+  const cfg = loadTriggerConfig();
+  if (!cfg.webhookUrl) return;
+
+  const startsAt = eventStartDate(eventData);
+  if (!startsAt || eventData.allDay) {
+    return;
+  }
+
+  const remindAt = new Date(startsAt.getTime() - TRIGGER_OFFSET_MINUTES * 60000);
+  const recipients = eventRecipients(eventData, cfg);
+  if (!recipients.length) return;
+
+  const previousJobIds = eventData.extendedProps?.reminderJobIds || [];
+  const response = await fetch(cfg.webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "cleanup_and_schedule",
+      eventId: eventData.id,
+      title: eventData.title,
+      details: eventData.extendedProps?.details || "",
+      startAt: startsAt.toISOString(),
+      remindAt: remindAt.toISOString(),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      recipients,
+      previousJobIds,
+      offsetMinutes: TRIGGER_OFFSET_MINUTES,
+      linkUrl: eventData.extendedProps?.linkUrl || "",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("No se pudo crear el trigger de email en Apps Script");
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  eventData.extendedProps.reminderJobIds = Array.isArray(payload?.jobIds) ? payload.jobIds : [];
+}
+
+async function cleanupEmailReminderTrigger(eventData) {
+  const cfg = loadTriggerConfig();
+  if (!cfg.webhookUrl) return;
+  const previousJobIds = eventData?.extendedProps?.reminderJobIds || [];
+  if (!previousJobIds.length) return;
+
+  await fetch(cfg.webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "cleanup_only",
+      eventId: eventData.id,
+      previousJobIds,
+    }),
+  });
 }
 
 async function syncEventsFromCalendar() {
@@ -457,6 +574,7 @@ async function syncEventsFromCalendar() {
       linkType: ev.extendedProps?.linkType || "otro",
       linkUrl: ev.extendedProps?.linkUrl || "",
       attachments: ev.extendedProps?.attachments || [],
+      reminderJobIds: ev.extendedProps?.reminderJobIds || [],
     },
     updatedAt: new Date().toISOString(),
   }));
@@ -624,6 +742,7 @@ async function saveEvent() {
   if (!state.calendar) return;
 
   const eventId = state.editingId || `ws_${Date.now()}`;
+  let targetEvent = null;
   $("saveEventBtn").disabled = true;
   $("saveEventBtn").textContent = "Guardando...";
 
@@ -648,8 +767,14 @@ async function saveEvent() {
       ev.setProp("backgroundColor", payload.backgroundColor);
       ev.setProp("borderColor", payload.borderColor);
       Object.entries(payload.extendedProps).forEach(([key, value]) => ev.setExtendedProp(key, value));
+      targetEvent = ev;
     } else {
-      state.calendar.addEvent(payload);
+      targetEvent = state.calendar.addEvent(payload);
+    }
+
+    await requestEmailReminderTrigger(payload);
+    if (targetEvent) {
+      targetEvent.setExtendedProp("reminderJobIds", payload.extendedProps.reminderJobIds || []);
     }
 
     await syncEventsFromCalendar();
@@ -666,6 +791,10 @@ async function deleteEvent() {
   if (!state.editingId || !state.calendar) return;
   const ev = state.calendar.getEventById(state.editingId);
   if (!ev) return;
+  await cleanupEmailReminderTrigger({
+    id: ev.id,
+    extendedProps: { reminderJobIds: ev.extendedProps?.reminderJobIds || [] },
+  });
   ev.remove();
   await syncEventsFromCalendar();
   resetEventForm();
@@ -678,6 +807,7 @@ async function init() {
   renderLinkTypeOptions();
   renderProfiles();
   renderAssigneesSelect();
+  renderTriggerConfig();
   resetEventForm();
   initCalendar();
 
@@ -691,6 +821,7 @@ async function init() {
   $("deleteEventBtn").onclick = deleteEvent;
   $("cancelEditEventBtn").onclick = resetEventForm;
   $("createProfileBtn").onclick = createProfile;
+  $("saveTriggerSettingsBtn").onclick = saveTriggerConfig;
   $("backAppBtn").onclick = () => { window.location.href = "index.html"; };
   window.addEventListener("online", flushPendingSync);
 }
