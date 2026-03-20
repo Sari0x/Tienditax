@@ -1326,7 +1326,12 @@ async function exportCsv() {
   if (dup.length) return showToast(`SKUs repetidos: ${dup.join(", ")}`);
 
   const headers = storeFields();
-  const csvRows = [headers.join(","), ...rows.map((r) => headers.map((h) => `"${(h === "Transaction Type" ? "purchasable" : (r[h] || "")).toString().replaceAll('"', '""')}"`).join(","))];
+  const csvRows = [headers.join(","), ...rows.map((r) => headers.map((h) => {
+    const value = h === "Transaction Type"
+      ? "purchasable"
+      : (h === "Category" ? (r.Category ?? r.category ?? "") : (r[h] ?? ""));
+    return `"${String(value).replaceAll('"', '""')}"`;
+  }).join(","))];
   const csv = csvRows.join("\n");
   const filename = `tienditax_${state.currentStore}_${nowArgentina()}.csv`;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
