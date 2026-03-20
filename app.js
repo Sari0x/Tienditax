@@ -1553,12 +1553,9 @@ async function init() {
 
   const categoriesRemote = await dbGet("categories");
   if (categoriesRemote) state.categories = categoriesRemote;
-  // migración suave de estructura vieja (bucket combinado -> buckets separados)
+  // migración suave de estructura vieja (bucket combinado -> bna)
   if (!state.categories.bna && Array.isArray(state.categories.bna_ciudad)) {
     state.categories.bna = [...state.categories.bna_ciudad];
-  }
-  if (!state.categories.ciudad && Array.isArray(state.categories.bna_ciudad)) {
-    state.categories.ciudad = [...state.categories.bna_ciudad];
   }
   if (!state.categories.bna) state.categories.bna = [];
   if (!state.categories.ciudad) state.categories.ciudad = [];
