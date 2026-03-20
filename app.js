@@ -19,7 +19,8 @@ const STORE_FIELDS = {
 const REQUIRED_FIELDS = ["Title", "Category", "Price", "Property SKU"];
 const DATE_FIELDS = ["Available On", "sale_on", "sale_until"];
 const CATEGORY_STORE_OPTIONS = [
-  { key: "bna_ciudad", label: "Tienda bna y ciudad" },
+  { key: "bna", label: "Tienda BNA" },
+  { key: "ciudad", label: "Tienda Ciudad" },
   { key: "macro", label: "Tienda Macro" },
 ];
 
@@ -499,7 +500,9 @@ function nowArgentina() {
   return new Date().toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).replace(" ", "_").replace(/:/g, "-");
 }
 function categoryBucket(storeKey) {
-  return storeKey === "macro" ? "macro" : "bna_ciudad";
+  if (storeKey === "macro") return "macro";
+  if (storeKey === "ciudad") return "ciudad";
+  return "bna";
 }
 function storeFields() {
   return STORE_FIELDS[state.currentStore] || STORE_FIELDS.bna;
@@ -1550,13 +1553,15 @@ async function init() {
 
   const categoriesRemote = await dbGet("categories");
   if (categoriesRemote) state.categories = categoriesRemote;
-  // migración suave de estructura vieja
-  if (!state.categories.bna_ciudad) {
-    state.categories.bna_ciudad = [
-      ...(state.categories.bna || []),
-      ...(state.categories.ciudad || []),
-    ];
+  // migración suave de estructura vieja (bucket combinado -> buckets separados)
+  if (!state.categories.bna && Array.isArray(state.categories.bna_ciudad)) {
+    state.categories.bna = [...state.categories.bna_ciudad];
   }
+  if (!state.categories.ciudad && Array.isArray(state.categories.bna_ciudad)) {
+    state.categories.ciudad = [...state.categories.bna_ciudad];
+  }
+  if (!state.categories.bna) state.categories.bna = [];
+  if (!state.categories.ciudad) state.categories.ciudad = [];
   if (!state.categories.macro) state.categories.macro = [];
 
   state.draft = JSON.parse(localStorage.getItem("ttx_draft") || "{}");
