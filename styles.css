@@ -40,6 +40,30 @@ body { margin: 0; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Sego
 .login-card { max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
 .brand-logo { width: 350px; max-width: 100%; align-self: center; }
 .login-btn { margin-top: 14px; }
+
+body.dark #loginView {
+  background: #ffffff;
+  color: #1c1c1e;
+}
+
+body.dark #loginView .login-card {
+  background: #ffffff;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.12);
+}
+
+body.dark #loginView label,
+body.dark #loginView input {
+  color: #1c1c1e;
+}
+
+body.dark #loginView .link-btn {
+  color: #0a84ff;
+}
+
+body.dark #loginView input {
+  background: #ffffff;
+  border-color: #d2d7e1;
+}
 input, select, textarea { border-radius: 14px; border: 1px solid var(--line); padding: 11px 12px; font-size: 14px; background: var(--surface-1); color: var(--text); font-family: inherit; }
 .password-wrap { display: flex; gap: 8px; align-items: center; }
 .password-wrap input { flex: 1; }
