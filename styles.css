@@ -35,7 +35,7 @@ body { margin: 0; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Sego
 .view { display: none !important; padding: 18px; }
 .view.active { display: block !important; }
 .centered-view { align-items: center; justify-content: center; min-height: calc(100vh - 80px); }
-#loginView.active { display: flex !important; }
+#loginView.active { display: flex !important; min-height: 100vh; }
 .card { background: var(--card); border-radius: 24px; box-shadow: var(--shadow); padding: 24px; width: min(1100px, 100%); margin: 0 auto; }
 .login-card { max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
 .brand-logo { width: 350px; max-width: 100%; align-self: center; }
