@@ -25,6 +25,8 @@ const CATEGORY_STORE_OPTIONS = [
 ];
 
 const ADMIN_USER = "manusario";
+const SHARED_CALENDAR_STORAGE_KEY = "ttx_calendar_events_shared";
+const SHARED_CALENDAR_DB_PATH = "calendar_shared";
 const SHARED_TARIFFS_STORAGE_KEY = "ttx_tariffs_rows_shared";
 const SHARED_TARIFFS_DB_PATH = "tariffs_shared";
 
@@ -74,21 +76,81 @@ function bindPreferenceSwitch(id, onChange) {
 }
 
 function calendarStorageKey() {
-  return `ttx_calendar_events_${state.user || "guest"}`;
+  return SHARED_CALENDAR_STORAGE_KEY;
 }
 
-function loadCalendarEvents() {
+function legacyCalendarStorageKeys() {
+  const keys = new Set();
+  if (state.user) keys.add(`ttx_calendar_events_${state.user}`);
+  if (ADMIN_USER) keys.add(`ttx_calendar_events_${ADMIN_USER}`);
+  keys.add("ttx_calendar_events_guest");
+  return [...keys];
+}
+
+function calendarDbPath() {
+  return SHARED_CALENDAR_DB_PATH;
+}
+
+async function loadCalendarEvents() {
+  let loaded = [];
+  let shouldSyncSharedRemote = false;
+
   try {
-    const raw = localStorage.getItem(calendarStorageKey());
-    const parsed = JSON.parse(raw || "[]");
-    state.calendarEvents = Array.isArray(parsed) ? parsed : [];
+    const remote = await dbGet(calendarDbPath());
+    loaded = Array.isArray(remote) ? remote : [];
+  } catch {
+    loaded = [];
+  }
+
+  if (!loaded.length) {
+    try {
+      const raw = localStorage.getItem(calendarStorageKey());
+      const parsed = JSON.parse(raw || "[]");
+      loaded = Array.isArray(parsed) ? parsed : [];
+      shouldSyncSharedRemote = loaded.length > 0;
+    } catch {
+      loaded = [];
+    }
+  }
+
+  if (!loaded.length) {
+    for (const legacyKey of legacyCalendarStorageKeys()) {
+      try {
+        const raw = localStorage.getItem(legacyKey);
+        const parsed = JSON.parse(raw || "[]");
+        if (Array.isArray(parsed) && parsed.length) {
+          loaded = parsed;
+          localStorage.setItem(calendarStorageKey(), JSON.stringify(parsed));
+          shouldSyncSharedRemote = true;
+          break;
+        }
+      } catch {
+        // seguimos con la siguiente fuente legacy
+      }
+    }
+  }
+
+  try {
+    state.calendarEvents = Array.isArray(loaded) ? loaded : [];
   } catch {
     state.calendarEvents = [];
+  }
+
+  localStorage.setItem(calendarStorageKey(), JSON.stringify(state.calendarEvents));
+  if (shouldSyncSharedRemote && state.calendarEvents.length) {
+    try {
+      await dbPut(calendarDbPath(), state.calendarEvents);
+    } catch {
+      // mantenemos el respaldo local compartido
+    }
   }
 }
 
 function persistCalendarEvents() {
   localStorage.setItem(calendarStorageKey(), JSON.stringify(state.calendarEvents));
+  return dbPut(calendarDbPath(), state.calendarEvents).catch(() => {
+    // fallback local ya guardado
+  });
 }
 
 function tariffsStorageKey() {
@@ -488,9 +550,9 @@ function initCalendar() {
   calendarInstance.render();
 }
 
-function openCalendarModal() {
+async function openCalendarModal() {
   closeAllDrawers();
-  loadCalendarEvents();
+  await loadCalendarEvents();
   $("calendarModal").classList.remove("hidden");
   resetCalendarForm();
   initCalendar();
@@ -1626,7 +1688,7 @@ async function init() {
 
   loadUserThemePreference();
   applyUserPreferences();
-  loadCalendarEvents();
+  await loadCalendarEvents();
   await loadTariffsRows();
 
   window.addEventListener("resize", syncTopScrollbar);
@@ -1641,7 +1703,7 @@ async function init() {
     state.user = userFromSession;
     loadUserThemePreference(state.user);
     applyUserPreferences();
-    loadCalendarEvents();
+    await loadCalendarEvents();
     await loadTariffsRows();
     // No auto-abrimos la hoja de carga: solo se entra desde el botón "Tiendas".
     switchView("storeView");
@@ -1650,7 +1712,7 @@ async function init() {
     const lastUser = localStorage.getItem("ttx_last_user");
     loadUserThemePreference(lastUser);
     applyUserPreferences();
-    loadCalendarEvents();
+    await loadCalendarEvents();
     await loadTariffsRows();
     switchView("loginView");
   }
@@ -1691,6 +1753,8 @@ async function completeLogin(user) {
   localStorage.setItem("ttx_last_user", state.user);
   loadUserThemePreference(state.user);
   applyUserPreferences();
+  await loadCalendarEvents();
+  await loadTariffsRows();
   switchView("storeView");
   loadHistory();
   showToast("Bienvenido");
