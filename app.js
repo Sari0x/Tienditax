@@ -25,6 +25,8 @@ const CATEGORY_STORE_OPTIONS = [
 ];
 
 const ADMIN_USER = "manusario";
+const SHARED_TARIFFS_STORAGE_KEY = "ttx_tariffs_rows_shared";
+const SHARED_TARIFFS_DB_PATH = "tariffs_shared";
 
 let state = { user: null, currentStore: null, categories: {}, products: {}, draft: {}, pendingDelete: null, historyPage: 1, conversionHistoryPage: 1, sessionsPage: 1, historyMode: "exports", skuCatalog: null, loginCredentials: [], activeSessionId: null, theme: "light", calendarEvents: [], calendarEditingId: null, tariffsRows: [] };
 let calendarInstance = null;
@@ -90,11 +92,27 @@ function persistCalendarEvents() {
 }
 
 function tariffsStorageKey() {
-  return `ttx_tariffs_rows_${state.user || "guest"}`;
+  return SHARED_TARIFFS_STORAGE_KEY;
 }
 
 function tariffsDbPath() {
-  return `tariffs/${state.user || "guest"}`;
+  return SHARED_TARIFFS_DB_PATH;
+}
+
+function legacyTariffsStorageKeys() {
+  const keys = new Set();
+  if (state.user) keys.add(`ttx_tariffs_rows_${state.user}`);
+  if (ADMIN_USER) keys.add(`ttx_tariffs_rows_${ADMIN_USER}`);
+  keys.add("ttx_tariffs_rows_guest");
+  return [...keys];
+}
+
+function legacyTariffsDbPaths() {
+  const paths = new Set();
+  if (state.user) paths.add(`tariffs/${state.user}`);
+  if (ADMIN_USER) paths.add(`tariffs/${ADMIN_USER}`);
+  paths.add("tariffs/guest");
+  return [...paths];
 }
 
 function defaultTariffRow() {
@@ -117,11 +135,28 @@ function normalizeTariffRow(rawRow) {
 
 async function loadTariffsRows() {
   let loaded = [];
+  let shouldSyncSharedRemote = false;
   try {
     const remote = await dbGet(tariffsDbPath());
     loaded = Array.isArray(remote) ? remote : [];
   } catch {
     loaded = [];
+  }
+
+  if (!loaded.length) {
+    for (const legacyPath of legacyTariffsDbPaths()) {
+      try {
+        const legacyRemote = await dbGet(legacyPath);
+        if (Array.isArray(legacyRemote) && legacyRemote.length) {
+          loaded = legacyRemote;
+          await dbPut(tariffsDbPath(), legacyRemote);
+          shouldSyncSharedRemote = false;
+          break;
+        }
+      } catch {
+        // seguimos con la siguiente fuente legacy
+      }
+    }
   }
 
   if (!loaded.length) {
@@ -134,8 +169,33 @@ async function loadTariffsRows() {
     }
   }
 
+  if (!loaded.length) {
+    for (const legacyKey of legacyTariffsStorageKeys()) {
+      try {
+        const raw = localStorage.getItem(legacyKey);
+        const parsed = JSON.parse(raw || "[]");
+        if (Array.isArray(parsed) && parsed.length) {
+          loaded = parsed;
+          localStorage.setItem(tariffsStorageKey(), JSON.stringify(parsed));
+          shouldSyncSharedRemote = true;
+          break;
+        }
+      } catch {
+        // seguimos con la siguiente fuente legacy
+      }
+    }
+  }
+
   state.tariffsRows = loaded.map((row) => normalizeTariffRow(row));
   if (!state.tariffsRows.length) state.tariffsRows = [defaultTariffRow()];
+  localStorage.setItem(tariffsStorageKey(), JSON.stringify(state.tariffsRows));
+  if (shouldSyncSharedRemote && state.tariffsRows.length) {
+    try {
+      await dbPut(tariffsDbPath(), state.tariffsRows);
+    } catch {
+      // mantenemos el respaldo local compartido
+    }
+  }
 }
 
 async function persistTariffsRows() {
